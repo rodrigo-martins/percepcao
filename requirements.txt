@@ -1,0 +1,6 @@
+pandas
+python-dotenv
+matplotlib
+geopandas
+geobr
+seaborn
