@@ -60,14 +60,13 @@ def add_manual_division_lines(extra_divisions, ax, spans, full_xmin, full_xmax, 
         # - se os índices são um intervalo contíguo, usar extremo inicial/final (centro entre eles)
         # - caso contrário, usar média das posições fornecidas
         idxs_sorted = sorted(idxs)
-        if idxs_sorted == list(range(idxs_sorted[0], idxs_sorted[-1] + 1)):
-            y_center = (y_positions[idxs_sorted[0]] + y_positions[idxs_sorted[-1]]) / 2.0
-        else:
-            try:
-                import numpy as _np
-                y_center = float(_np.mean([y_positions[i] for i in idxs_sorted]))
-            except Exception:
-                y_center = sum([y_positions[i] for i in idxs_sorted]) / len(idxs_sorted)
+        # colocar a linha *abaixo* do último item do grupo (não no meio):
+        # usa a posição do maior índice + 0.5 (fronteira entre esse item e o próximo)
+        try:
+            y_center = float(y_positions[idxs_sorted[-1]]) + 0.5
+        except Exception:
+            # fallback robusto: média + 0.5
+            y_center = (sum([y_positions[i] for i in idxs_sorted]) / len(idxs_sorted)) + 0.5
 
         # desenhar linha contínua atravessando todo o gráfico (cobre area das barras e espaço à direita)
         ax.hlines(y_center, full_xmin, full_xmax, colors=color, linewidth=linewidth, linestyles=line_style, zorder=3)
