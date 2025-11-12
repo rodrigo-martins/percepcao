@@ -22,8 +22,8 @@ BASE_ORANGE = "#ff6002"
 
 
 def add_manual_division_lines(extra_divisions, ax, spans, full_xmin, full_xmax, x_label_pos,
-                               y_positions=None, line_style='-', color='black', linewidth=1.2,
-                               label_pad=0.02, rotate=0, fontsize=9):
+                               y_positions=None, line_style='-', color='gray', linewidth=1.2,
+                               label_pad=0.02, rotate=270, fontsize=9, counts=None, response_order=None):
     """
     Desenha linhas contínuas (solid) no eixo y para cada divisão definida em extra_divisions
     e posiciona um label à direita do rótulo da subcategoria.
@@ -60,21 +60,42 @@ def add_manual_division_lines(extra_divisions, ax, spans, full_xmin, full_xmax, 
         # - se os índices são um intervalo contíguo, usar extremo inicial/final (centro entre eles)
         # - caso contrário, usar média das posições fornecidas
         idxs_sorted = sorted(idxs)
-        # colocar a linha *abaixo* do último item do grupo (não no meio):
+        # colocar a linha *abaixo* do último item do grupo:
         # usa a posição do maior índice + 0.5 (fronteira entre esse item e o próximo)
         try:
-            y_center = float(y_positions[idxs_sorted[-1]]) + 0.5
+            y_line = float(y_positions[idxs_sorted[-1]]) + 0.5
         except Exception:
             # fallback robusto: média + 0.5
-            y_center = (sum([y_positions[i] for i in idxs_sorted]) / len(idxs_sorted)) + 0.5
+            y_line = (sum([y_positions[i] for i in idxs_sorted]) / len(idxs_sorted)) + 0.5
+
+        # posição do rótulo: centralizado verticalmente entre o primeiro e o último item do grupo
+        # (como fazem as subcategorias)
+        try:
+            y_label = (float(y_positions[idxs_sorted[0]]) + float(y_positions[idxs_sorted[-1]])) / 2.0
+        except Exception:
+            y_label = sum([y_positions[i] for i in idxs_sorted]) / len(idxs_sorted)
 
         # desenhar linha contínua atravessando todo o gráfico (cobre area das barras e espaço à direita)
-        ax.hlines(y_center, full_xmin, full_xmax, colors=color, linewidth=linewidth, linestyles=line_style, zorder=3)
+        ax.hlines(y_line, full_xmin, full_xmax, colors='gray', linewidth=linewidth, linestyles=line_style, zorder=3)
 
         # label à direita do label de subcategoria: usar ha='left'
         # colocar o label um pouco à direita do x_label_pos (que normalmente já está à direita dos rótulos)
-        x_label = x_label_pos + label_pad * (full_xmax - full_xmin)
-        ax.text(x_label, y_center, str(label), ha="left", va="center", rotation=rotate,
+        x_label = x_label_pos + label_pad * (full_xmax - full_xmin) + 5
+        
+        # calcular média e adicionar ao label se counts foi fornecido
+        label_display = str(label)
+        if counts is not None and response_order is not None:
+            mean_val = _calculate_likert_mean(idxs_sorted, counts, response_order)
+            if mean_val is not None:
+                label_display = f"{label} ({mean_val:.2f})"
+            print(f"[extra_divisions] {label} (índices {idxs_sorted}): média = {mean_val:.2f}")
+        
+        # quebrar rótulo em múltiplas linhas para melhor encaixe quando rotacionado
+        import textwrap
+        wrapped_label = textwrap.fill(label_display, width=25, break_long_words=True, break_on_hyphens=True)
+          
+        ax.text(x_label, y_label, wrapped_label, ha="center", va="center", rotation=rotate,
+                linespacing=1.0,
                 fontsize=fontsize, color=color, zorder=4, clip_on=False)
 
 
@@ -226,32 +247,15 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
     ]
 
     manual_divisions = [
-            ("Organizational Analysis", 0, 1),
-            ("Job/Task Analysis", [2,3,4]),
-            ("Individual Characteristics", [5,6,7]),
-            ("Training Motivation", [9,10,11,12]),
-            ("Training Induction and Pretraining Environment", [13,14]),
-            ("Specific Learning Approaches", [15,16,17,18]),
-            ("Simulation-Based Training and Games", [19]),
-            ("Team Training", [20]),
-            ("Training Evaluation", [21,22,23]),
-            ("Transfer of Training", [24,25,26,27]),
-        ]
-    manual_divisions = [
-            # --- BEFORE TRAINING ---
-            ("Organizational Analysis", [0, 1]),
-            ("Job/Task Analysis", [2, 3, 4]),
-            
-            # --- DURING TRAINING ---
-            ("Individual Characteristics", [5, 6, 7]),
-            ("Training Motivation", [8, 9, 10, 11, 12]),
-            ("Training Induction and Pretraining Environment", [13, 14]),
-            ("Specific Learning Approaches", [15, 16, 17, 18]),
-            ("Team Training", [19]),
-            
-            # --- AFTER TRAINING ---
-            ("Training Evaluation", [20, 21, 22]),
-            ("Transfer of Training", [23, 24, 25, 26]),
+            ("Análise Organizacional", [0, 1]),
+            ("Análise de Cargos/Tarefas", [2, 3, 4]),
+            ("Características Individuais", [5, 6, 7]),
+            ("Motivação para o Treinamento", [8, 9, 10, 11, 12]),
+            ("Indução ao Treinamento e Ambiente de Pré-treinamento", [13, 14]),
+            ("Abordagens Específicas de Aprendizagem", [15, 16, 17, 18]),
+            ("Treinamento em Equipe", [19]),
+            ("Avaliação do Treinamento", [20, 21, 22]),
+            ("Transferência do Treinamento", [23, 24, 25, 26]),
         ]
 
     # pergunta a remover explicitamente (se presente)
@@ -499,18 +503,43 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
         full_xmin, full_xmax = ax.get_xlim()
 
         # definir divisões extras (editar conforme necessário)
+        # Formatos permitidos:
+        #  ("Label", start_idx, end_idx)  -> índices inclusivos (0-based)
+        #  ("Label", [i1, i2, ...])      -> lista explícita de índices
         extra_divisions = [
-            ("Divisão Especial A", [2, 3, 4]),         # lista de índices (ordem do eixo y)
-            ("Divisão Especial B", 8, 10),             # range start..end (inclusivo)
+            ("ANÁLISE DAS NECESSIDADES DE TREINAMENTO", 0, 4),
+            ("CONDIÇÕES ANTECEDENTES DO TREINAMENTO", 5, 14),
+            ("MÉTODOS DE TREINAMENTO E ESTRATÉGIAS DE INSTRUÇÃO", 15, 19),
+            ("CONDIÇÃO PÓS-TREINAMENTO", 20, 26),
         ]
-
+ 
         # desenhar linhas tracejadas para fronteiras entre subcategorias
         for b in sub_boundaries:
             ax.hlines(b, full_xmin, full_xmax, colors="gray", linewidth=1.0, linestyles="--", zorder=2)
 
+        # calcular e imprimir médias das manual_divisions (subcategorias)
+        print("\n[manual_divisions] Médias por subcategoria:")
+        for item in manual_divisions:
+            if len(item) == 3 and isinstance(item[1], int) and isinstance(item[2], int):
+                label, start_i, end_i = item
+                idxs = list(range(max(0, start_i), min(len(percent), end_i) + 1))
+            elif len(item) == 2 and isinstance(item[1], (list, tuple)):
+                label, idxs = item
+                idxs = [k for k in idxs if 0 <= k < len(percent)]
+            else:
+                continue
+
+            if idxs:
+                mean_val = _calculate_likert_mean(sorted(idxs), counts, order)
+                if mean_val is not None:
+                    print(f"  {label} (índices {sorted(idxs)}): média = {mean_val:.2f}")
+                else:
+                    print(f"  {label} (índices {sorted(idxs)}): sem dados")
+
         # agrupar índices por subcategoria para posicionar rótulos verticalmente no lado direito
         from collections import defaultdict
         spans = defaultdict(list)
+
         for idx, sub in enumerate(subs_ordered):
             spans[sub].append(idx)
 
@@ -522,10 +551,11 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
         y_positions = _np.arange(len(percent))
         add_manual_division_lines(
             extra_divisions, ax, spans, full_xmin, full_xmax,
-            x_label_pos=x_text_base + (xmax - xmin) * 0.06,
+            x_label_pos=x_text_base + (xmax - xmin) * 0.06 + 3,
             y_positions=y_positions, line_style='-', color='black', linewidth=1.2,
-            label_pad=0.01, rotate=0, fontsize=9
-        )
+            label_pad=0.01, rotate=270, fontsize=9,
+            counts=counts, response_order=order
+         )
 
         # DEBUG: imprimir ordem das subcategorias, posições e perguntas correspondentes
         print("Subcategorias (ordem de aparição) e posições:")
@@ -552,12 +582,82 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
             if not idxs:
                 continue
             y_center = (y_positions[min(idxs)] + y_positions[max(idxs)]) / 2.0
-            wrapped_label = "\n".join(wrap(sub, width=20))
-            ax.text(x_text_base, y_center, wrapped_label, ha="center", va="center", rotation=0,
-                     fontsize=9, color="black", zorder=5)
-
+            # calcular média e adicionar ao label (igual extra_divisions)
+            label_display = str(sub)
+            mean_val = _calculate_likert_mean(sorted(idxs), counts, order)
+            if mean_val is not None:
+                label_display = f"{sub} ({mean_val:.2f})"
+        
+            wrapped_label = "\n".join(wrap(label_display, width=20))
+            ax.text(x_text_base+8, y_center, wrapped_label, ha="right", va="center", rotation=0,
+                    fontsize=9, color="black", zorder=5)
+ 
         # --- fim divisão por subcategorias ---
-         # --- fim divisão por categorias ---
+        # --- fim divisão por categorias ---
+
+        # adicionar nota no rodapé explicando as médias entre parênteses
+        try:
+            fig = ax.get_figure()
+            fig.text(
+                0.02, 0.01,
+                "Nota: números entre parênteses são as médias (escala 1–5).",
+                fontsize=8, ha="left", va="bottom", color="black"
+            )
+        except Exception:
+            # não crítico — seguir sem a anotação se falhar
+            pass
+
+        # --- Anotar média de cada pergunta no lado esquerdo do gráfico ---
+        try:
+            import numpy as _np
+            y_positions_for_bars = _np.arange(len(percent))
+            xmin, xmax = ax.get_xlim()
+            # posicionar médias à esquerda do limite das barras (um pouco para fora)
+            x_mean_left = xmin - (xmax - xmin) * 0.05 + 20
+
+            # mapear respostas para valores 1..5 usando 'order'
+            resp_map = {}
+            if isinstance(order, (list, tuple)) and len(order) >= 5:
+                resp_map = { order[0]: 1, order[1]: 2, order[2]: 3, order[3]: 4, order[4]: 5 }
+
+            for i, qlabel in enumerate(percent.index):
+                # obter linha correspondente em counts: preferir loc por label, fallback iloc
+                row = None
+                try:
+                    if qlabel in counts.index:
+                        row = counts.loc[qlabel]
+                except Exception:
+                    row = None
+                if row is None and i < len(counts):
+                    try:
+                        row = counts.iloc[i]
+                    except Exception:
+                        row = None
+
+                if row is None:
+                    continue
+
+                total_w = 0.0
+                total_n = 0.0
+                for resp_label, val in resp_map.items():
+                    try:
+                        c = float(row.get(resp_label, 0) or 0)
+                    except Exception:
+                        c = 0.0
+                    total_w += val * c
+                    total_n += c
+                if total_n > 0:
+                    mean_val = total_w / total_n
+                    txt = f"({mean_val:.2f})"
+                else:
+                    txt = "-"
+
+                y = float(y_positions_for_bars[i])
+                # alinhar texto à direita para ficar colado ao limite esquerdo
+                ax.text(x_mean_left, y, txt, ha="center", va="center",
+                        fontsize=8, color="black", zorder=10, clip_on=False)
+        except Exception as _e:
+            print("warning: não foi possível anotar médias nas barras:", _e)
 
         # visual tweaks
         ax.axvline(0, color="black", linewidth=0.8)
@@ -567,7 +667,16 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
 
         ax.set_yticks(range(len(counts)))
         # colocar as perguntas (labels) à esquerda do gráfico
-        ax.set_yticklabels(percent.index, fontsize=9)
+        # ax.set_yticklabels(percent.index, fontsize=9)
+        # adicionar prefixo Q1, Q2, ... em negrito ao lado esquerdo do texto da pergunta
+        prefixed_labels = []
+        for i, lab in enumerate(percent.index):
+            # manter quebras existentes e envolver para exibição
+            wrapped = "\n".join(wrap(str(lab), width=70))
+            # prefixo em negrito usando mathtext (\bf{})
+            prefix = f"$\\bf{{Q{i+1}}}$"
+            prefixed_labels.append(f"{prefix} - {wrapped}")
+        ax.set_yticklabels(prefixed_labels, fontsize=9)
         ax.yaxis.tick_left()
         ax.tick_params(axis="y", which="both", left=True, labelleft=True, right=False, labelright=False)
         ax.invert_yaxis()
@@ -601,6 +710,98 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
         "image": image_path,
     }
 
+def _calculate_likert_mean(idxs, counts, order):
+    """
+    Calcula a média da escala Likert para um grupo de perguntas.
+    idxs: lista de índices das perguntas
+    counts: DataFrame com contagens por resposta
+    order: lista de respostas na ordem da escala (ex: ["Discordo totalmente", ..., "Concordo totalmente"])
+    
+    Retorna: média numérica (1-5) ou None se não houver dados
+    """
+    if not idxs:
+        return None
+    
+    # mapear respostas para valores numéricos (1-5)
+    response_values = {
+        order[0]: 1,  # Discordo totalmente
+        order[1]: 2,  # Discordo
+        order[2]: 3,  # Neutro
+        order[3]: 4,  # Concordo
+        order[4]: 5,  # Concordo totalmente
+    }
+    
+    total_weighted = 0
+    total_count = 0
+    
+    for idx in idxs:
+        if idx < len(counts):
+            row = counts.iloc[idx]
+            for response in order:
+                count = row.get(response, 0)
+                if count > 0:
+                    value = response_values.get(response, 3)
+                    total_weighted += value * count
+                    total_count += count
+    
+    if total_count > 0:
+        return total_weighted / total_count
+    return None
+
+def _calculate_likert_mean_for_group(idxs: List[int], counts_df, order, percent_index):
+    """
+    Calcula média para um grupo de perguntas.
+    - idxs: índices (0-based) relativos à ordem exibida (percent.index)
+    - counts_df: DataFrame de contagens (linhas = perguntas, colunas = respostas)
+    - order: lista com rótulos das respostas na ordem da escala (1..5)
+    - percent_index: Index com os rótulos das perguntas (na mesma ordem mostrada)
+    Retorna float média ou None.
+    """
+    if not idxs:
+        return None
+    # criar mapa de valor numérico para cada rótulo de resposta
+    if not isinstance(order, (list, tuple)) or len(order) < 5:
+        return None
+    resp_map = { order[0]: 1, order[1]: 2, order[2]: 3, order[3]: 4, order[4]: 5 }
+
+    total_w = 0.0
+    total_n = 0.0
+    for idx in idxs:
+        if idx < 0 or idx >= len(percent_index):
+            continue
+        qlabel = percent_index[idx]
+        # tentar obter linha correspondente em counts_df pelo label, senão por posição
+        row = None
+        try:
+            if qlabel in counts_df.index:
+                row = counts_df.loc[qlabel]
+        except Exception:
+            row = None
+        if row is None:
+            try:
+                row = counts_df.iloc[idx]
+            except Exception:
+                row = None
+        if row is None:
+            continue
+        for resp_label, val in resp_map.items():
+            try:
+                c = float(row.get(resp_label, 0) or 0)
+            except Exception:
+                c = 0.0
+            total_w += val * c
+            total_n += c
+
+    if total_n > 0:
+        return total_w / total_n
+    return None
+
+# --- substituir chamadas existentes para usar a nova função ---
+# Exemplo: onde antes chamava _calculate_likert_mean(sorted(idxs), counts, order)
+# troque por:
+#    mean_val = _calculate_likert_mean_for_group(sorted(idxs), counts, order, percent.index)
+# E para manual_divisions debug/print use o mesmo.
+# ...existing code...
 if __name__ == "__main__":
     import os
     import sys
