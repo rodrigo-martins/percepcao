@@ -595,25 +595,25 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
         # --- fim divisão por subcategorias ---
         # --- fim divisão por categorias ---
 
-        # adicionar nota no rodapé explicando as médias entre parênteses
+        # adicionar nota no rodapé explicando as médias e desvios padrão entre parênteses
         try:
             fig = ax.get_figure()
             fig.text(
                 0.02, 0.01,
-                "Nota: números entre parênteses são as médias (escala 1–5).",
+                "Nota: números entre parênteses são as médias (escala 1–5); valores entre colchetes são desvios padrão.",
                 fontsize=8, ha="left", va="bottom", color="black"
             )
         except Exception:
             # não crítico — seguir sem a anotação se falhar
             pass
 
-        # --- Anotar média de cada pergunta no lado esquerdo do gráfico ---
+        # --- Anotar média e desvio padrão de cada pergunta no lado esquerdo do gráfico ---
         try:
             import numpy as _np
             y_positions_for_bars = _np.arange(len(percent))
             xmin, xmax = ax.get_xlim()
             # posicionar médias à esquerda do limite das barras (um pouco para fora)
-            x_mean_left = xmin - (xmax - xmin) * 0.05 + 20
+            x_mean_left = xmin - (xmax - xmin) * 0.05 + 26
 
             # mapear respostas para valores 1..5 usando 'order'
             resp_map = {}
@@ -639,6 +639,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
 
                 total_w = 0.0
                 total_n = 0.0
+                values_list = []  # para calcular desvio padrão
                 for resp_label, val in resp_map.items():
                     try:
                         c = float(row.get(resp_label, 0) or 0)
@@ -646,9 +647,18 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
                         c = 0.0
                     total_w += val * c
                     total_n += c
+                    # adicionar os valores individuais (repetidos pela contagem)
+                    for _ in range(int(c)):
+                        values_list.append(val)
+
                 if total_n > 0:
                     mean_val = total_w / total_n
-                    txt = f"({mean_val:.2f})"
+                    # calcular desvio padrão
+                    if len(values_list) > 1:
+                        std_val = _np.std(values_list, ddof=1)  # ddof=1 para amostra
+                    else:
+                        std_val = 0.0
+                    txt = f"({mean_val:.2f} [{std_val:.2f}])"
                 else:
                     txt = "-"
 
