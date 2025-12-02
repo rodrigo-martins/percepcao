@@ -108,6 +108,7 @@ def process(csv_path: Optional[str] = None, out_dat: Optional[str] = None,
         "Tive o apoio e os recursos necessários (tempo, tecnologia, suporte) da empresa para realizar esta experiência de aprendizado.",
 
         # Job/Task Analysis
+        # "Soube quem na sua empresa foi o responsável por organizar a experiência de aprendizado.",
         "O conteúdo da experiência de aprendizado atendeu às necessidades da minha função.",
         "O conteúdo da experiência de aprendizado foi adaptado ao meu nível de experiência.",
         "Minha opinião foi considerada na criação da experiência de aprendizado que participei.",
@@ -161,12 +162,26 @@ def process(csv_path: Optional[str] = None, out_dat: Optional[str] = None,
     used = set()
     for label in desired_order:
         nl = _normalize_text(label)
-        if nl in norm_to_col and norm_to_col[nl] not in used:
-            ordered.append(norm_to_col[nl])
-            used.add(norm_to_col[nl])
+        if nl in norm_to_col:
+            col = norm_to_col[nl]
+            if col not in used:
+                ordered.append(col)
+                used.add(col)
+                print(f"  ✓ Matched: '{label[:50]}...' -> {col}")
+            else:
+                print(f"  ⚠ Duplicado (já usado): '{label[:50]}...'")
+        else:
+            print(f"  ✗ NÃO ENCONTRADO: '{label[:50]}...'")
+            print(f"     Procurou norm: '{nl}'")
+            # debug: mostrar os 3 mais similares
+            from difflib import SequenceMatcher
+            similar = sorted(norm_to_col.keys(), key=lambda k: SequenceMatcher(None, nl, k).ratio(), reverse=True)[:3]
+            print(f"     Similares: {similar}")
+
     # acrescentar quaisquer colunas restantes não listadas em desired_order, preservando ordem original
     for c in likert_cols:
         if c not in used:
+            print(f"  + Adicionada ao final (não em desired_order): {c}")
             ordered.append(c)
     likert_cols = ordered
     print(f"Ordem Likert aplicada: {len(likert_cols)} colunas (as não listadas em desired_order foram adicionadas ao final).")

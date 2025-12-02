@@ -585,9 +585,26 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
             # calcular média e adicionar ao label (igual extra_divisions)
             label_display = str(sub)
             mean_val = _calculate_likert_mean(sorted(idxs), counts, order)
+            # calcular desvio padrão
+            values_list = []
+            for idx in sorted(idxs):
+                if idx < len(counts):
+                    row = counts.iloc[idx]
+                    resp_map = {order[i]: i+1 for i in range(min(5, len(order)))}
+                    for resp_label, val_num in resp_map.items():
+                        try:
+                            c = float(row.get(resp_label, 0) or 0)
+                            for _ in range(int(c)):
+                                values_list.append(val_num)
+                        except Exception:
+                            pass
+            if len(values_list) > 1:
+                std_val = _np.std(values_list, ddof=1)
+            else:
+                std_val = 0.0
             if mean_val is not None:
-                label_display = f"{sub} ({mean_val:.2f})"
-        
+                label_display = f"{sub} ({mean_val:.2f}\u00A0[{std_val:.2f}])"
+         
             wrapped_label = "\n".join(wrap(label_display, width=20))
             ax.text(x_text_base+8, y_center, wrapped_label, ha="right", va="center", rotation=0,
                     fontsize=9, color="black", zorder=5)
