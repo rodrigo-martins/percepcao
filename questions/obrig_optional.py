@@ -32,11 +32,8 @@ def _map_choice_to_category(s: str) -> Optional[str]:
         return "Obrigatório"
     if "opcion" in t or "opcional" in t:
         return "Opcional"
-    # alguns formulários podem ter "Obrigatório / Opcional" juntos; priorizar mapeamento por palavra
     if "/" in t or "|" in t:
         if "obrig" in t and "opcion" in t:
-            # tratar como ambos -> mapear como 'Obrigatório' por preferência, ou considerar "Opcional"?
-            # Aqui contamos como 'Obrigatório' se contiver 'obrig' também.
             return "Obrigatório"
     return None
 
@@ -121,12 +118,12 @@ def analyze_obrig_optional(df: pd.DataFrame, out_dir: Optional[Path] = None) -> 
             color_map[idx] = shades[shade_idx]
 
         # plot pie
-        fig, ax = plt.subplots(figsize=(6, 6))
+        fig, ax = plt.subplots(figsize=(8, 6))
         total_float = float(values.sum()) if values.sum() > 0 else 1.0
 
         def autopct(pct):
             absolute = int(round(pct * total_float / 100.0))
-            return f"{absolute}\n{pct:.1f}%"
+            return f"{pct:.1f}%\n({absolute})"  # já em português (% é universal)
 
         wedges, texts, autotexts = ax.pie(
             values,
@@ -134,23 +131,25 @@ def analyze_obrig_optional(df: pd.DataFrame, out_dir: Optional[Path] = None) -> 
             autopct=autopct,
             startangle=90,
             colors=color_map,
+            explode=[0.05] * len(values),
             wedgeprops={"edgecolor": "white", "linewidth": 0.8},
-            textprops={"fontsize": 10},
+            textprops={"fontsize": 20, "fontweight": "bold"},
         )
         ax.axis("equal")
-        # legenda com apenas 'Obrigatório' / 'Opcional' + inteiro
-        legend_labels = [f"{lab} ({int(v)})" for lab, v in zip(labels, values)]
-        ax.legend(wedges, legend_labels, title="", loc="center left", bbox_to_anchor=(1.02, 0.5))
-
-        ax.set_title("Obrigatório / Opcional")
+        # legenda com apenas 'Obrigatório' / 'Opcional' (SEM inteiro) na PARTE SUPERIOR
+        legend_labels = [f"{lab}" for lab in labels]
+        ax.legend(wedges, legend_labels, title="", loc="upper center", bbox_to_anchor=(0.5, 1.05), ncol=2, frameon=False, fontsize=20)
 
         # ajustar cor do texto nas fatias para legibilidade
         for at, wg in zip(autotexts, wedges):
             face = wg.get_facecolor()
             luminance = 0.2126 * face[0] + 0.7152 * face[1] + 0.0722 * face[2]
             at.set_color("white" if luminance < 0.6 else "black")
-            at.set_fontweight("bold")
+            # porcentagem em bold, número absoluto sem bold
+            at.set_fontsize(20)
+            at.set_fontweight("normal")
 
+        plt.tight_layout()
         out_file = out_dir / "obrig_optional_pie.png"
         fig.savefig(out_file, dpi=150, bbox_inches="tight")
         plt.close(fig)
@@ -161,6 +160,7 @@ def analyze_obrig_optional(df: pd.DataFrame, out_dir: Optional[Path] = None) -> 
     return {"column": col, "counts": counts, "total": total, "percentages": percentages, "image": image_path}
 
 
+# execução direta para debugging / geração de imagem
 if __name__ == "__main__":
     import os
     import sys

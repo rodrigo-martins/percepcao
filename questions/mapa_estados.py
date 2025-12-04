@@ -72,8 +72,20 @@ def plot_respondentes_por_estado(
         ax=ax
     )
 
-    ax.set_title("Distribuição de Respondentes por Estado", fontsize=16, fontweight="bold")
+    # ax.set_title("Distribuição de Respondentes por Estado", fontsize=16, fontweight="bold")
     ax.axis("off")
+
+    # estados do nordeste compacto que ficarão fora do mapa
+    northeast_compact = {"SE", "AL", "PE", "PB", "RN"}
+    
+    # mapeamento de deslocamento Y para cada estado nordestino (evitar sobreposição)
+    northeast_y_offset = {
+        "RN": 3,
+        "PB": 1.5,
+        "PE": 0.0,
+        "AL": -1.5,
+        "SE": -3.5,
+    }
 
     # anotações: colocar número inteiro em cima e porcentagem abaixo
     for _, row in mapa.iterrows():
@@ -84,16 +96,38 @@ def plot_respondentes_por_estado(
             pt = row.geometry.representative_point()
             x, y = pt.x, pt.y
             pct = row["pct"]
-            # rótulo em duas linhas: número inteiro em cima, porcentagem abaixo
-            label = f"{cnt}\n{pct:.1f}%"
-            # escolher cor do texto conforme a cor do estado no mapa
-            face = cmap(norm(cnt))
-            luminance = 0.2126 * face[0] + 0.7152 * face[1] + 0.0722 * face[2]
-            text_color = "white" if luminance < 0.6 else "black"
-            ax.text(x, y, label, ha="center", va="center", fontsize=8, color=text_color, fontweight="bold")
+            # rótulo em duas linhas: porcentagem em cima, número inteiro abaixo
+            label = f"{pct:.1f}%\n({cnt})"
+            
+            # verificar se é estado do nordeste compacto (usar sigla UF)
+            uf = row.get("UF", "").strip()
+            is_northeast = uf in northeast_compact
+            
+            # deslocar X para estados do nordeste
+            text_x = x + 4 if is_northeast else x
+            # deslocar Y também para evitar sobreposição
+            text_y = y + northeast_y_offset.get(uf, 0) if is_northeast else y
+            
+            if is_northeast:
+                # fora do mapa com seta preta
+                ax.annotate(
+                    label,
+                    xy=(x, y),
+                    xytext=(text_x, text_y),
+                    ha="left", va="center",
+                    fontsize=10, color="black", fontweight="bold",
+                    arrowprops=dict(arrowstyle="->", color="black", lw=1.5),
+                    bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.9, edgecolor="black")
+                )
+            else:
+                # dentro do mapa com cor adaptada
+                face = cmap(norm(cnt))
+                luminance = 0.2126 * face[0] + 0.7152 * face[1] + 0.0722 * face[2]
+                text_color = "white" if luminance < 0.6 else "black"
+                ax.text(text_x, text_y, label, ha="center", va="center", fontsize=10, color=text_color, fontweight="bold")
         except Exception:
             continue
-
+ 
     out_path = out_dir / "mapa_estados.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)

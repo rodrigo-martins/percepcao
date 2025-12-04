@@ -144,20 +144,20 @@ def analyze_nivel_profissional(df: pd.DataFrame, out_dir: Optional[Path] = None)
             color_map[idx] = shades[shade_idx]
 
         # plot horizontal bars
-        fig, ax = plt.subplots(figsize=(9, 5))
+        fig, ax = plt.subplots(figsize=(9, 4))
         y_pos = list(range(len(labels)))
         bars = ax.barh(y_pos, values, color=color_map, edgecolor="white")
         ax.set_yticks(y_pos)
         ax.set_yticklabels(labels)
         ax.invert_yaxis()
         ax.set_xlabel("Contagem")
-        ax.set_title("Nível profissional atual")
+        # ax.set_title("Nível profissional atual")
 
         # annotate numbers inside bars when possible
         vmax = values.max() if len(values) else 1
         for bar, val in zip(bars, values):
             pct = (val / total * 100) if total else 0.0
-            label = f"{int(val)} ({pct:.1f}%)"
+            label = f"{pct:.1f}% ({int(val)})"
             inside_threshold = vmax * 0.15
             if val >= inside_threshold:
                 x = val - vmax * 0.02
@@ -171,7 +171,7 @@ def analyze_nivel_profissional(df: pd.DataFrame, out_dir: Optional[Path] = None)
                 text_color = "white" if luminance < 0.6 else "black"
             except Exception:
                 text_color = "black"
-            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=9)
+            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=12)
 
         plt.tight_layout()
         out_file = out_dir / "nivel_profissional_barras_horizontais.png"

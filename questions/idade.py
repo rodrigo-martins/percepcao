@@ -80,7 +80,7 @@ def plot_ages(ages: pd.Series, out_dir: Path) -> Optional[Path]:
     q3 = float(ages.quantile(0.75))
     total = len(ages)
 
-    fig, ax = plt.subplots(figsize=(9, 5))
+    fig, ax = plt.subplots(figsize=(24, 9))
     # barras laranja
     ax.bar(x, y, width=0.8, color="#ff6002", label="Contagem por idade")
 
@@ -96,15 +96,16 @@ def plot_ages(ages: pd.Series, out_dir: Path) -> Optional[Path]:
     ax.axvline(q3, color="black", linestyle="--", lw=1)
     # anotações próximas ao topo para cada quartil
     ylim_top = max(y.max(), pdf_scaled.max()) * 0.98
-    ax.text(q1, ylim_top, f"Q1={q1:.1f}", ha="center", va="top", fontsize=9)
-    ax.text(q2, ylim_top, f"Q2={q2:.1f}", ha="center", va="top", fontsize=9)
-    ax.text(q3, ylim_top, f"Q3={q3:.1f}", ha="center", va="top", fontsize=9)
+    ax.text(q1, ylim_top, f"Q1={q1:.1f}", ha="center", va="top", fontsize=24)
+    ax.text(q2, ylim_top, f"Q2={q2:.1f}", ha="center", va="top", fontsize=24)
+    ax.text(q3, ylim_top, f"Q3={q3:.1f}", ha="center", va="top", fontsize=24)
 
-    ax.set_xlabel("Idade")
-    ax.set_ylabel("Contagem")
-    ax.set_title("Distribuição de Idade com curva normal")
+    ax.set_xlabel("Idade", fontsize=24)
+    ax.set_ylabel("Contagem", fontsize=24)
+    ax.tick_params(axis='both', labelsize=24)
+    # ax.set_title("Distribuição de Idade com curva normal")
     # somente um label na legenda (das barras)
-    ax.legend(loc="upper left")
+    ax.legend(loc="upper left", fontsize=24)
 
     # caixa com describe() em formato legível
     desc = ages.describe()
@@ -124,7 +125,7 @@ def plot_ages(ages: pd.Series, out_dir: Path) -> Optional[Path]:
         0.95,
         stats_text,
         transform=ax.transAxes,
-        fontsize=9,
+        fontsize=24,
         va="top",
         ha="right",
         bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.8, edgecolor="gray"),

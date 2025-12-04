@@ -146,20 +146,20 @@ def analyze_instrucao(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[
             color_map[idx] = shades[shade_idx]
 
         # criar gráfico horizontal
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=(8, 3))
         y_pos = list(range(len(labels)))
         bars = ax.barh(y_pos, values, color=color_map, edgecolor="white")
         ax.set_yticks(y_pos)
         ax.set_yticklabels(labels)
         ax.invert_yaxis()  # maior em cima (visual preferencial)
         ax.set_xlabel("Contagem")
-        ax.set_title("Grau de Instrução")
+        # ax.set_title("Grau de Instrução")
 
         # anotar contagem e porcentagem dentro da barra quando couber
         vmax = values.max() if len(values) else 1
         for i, (bar, val) in enumerate(zip(bars, values)):
             pct = (val / total * 100) if total else 0.0
-            label = f"{int(val)} ({pct:.1f}%)"
+            label = f"{pct:.1f}% ({int(val)})"
             # posição dentro quando a barra for suficientemente larga, caso contrário fora à direita
             inside_threshold = vmax * 0.15
             if val >= inside_threshold:
@@ -177,7 +177,7 @@ def analyze_instrucao(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[
             except Exception:
                 text_color = "black"
 
-            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=9)
+            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=12)
 
         plt.tight_layout()
         out_file = out_dir / "instrucao_barras_horizontais.png"

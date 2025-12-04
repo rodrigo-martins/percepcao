@@ -167,20 +167,20 @@ def analyze_experiencia(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dic
             color_map[idx] = shades[shade_idx]
 
         # plot horizontal
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=(8, 4))
         y_pos = list(range(len(labels)))
         bars = ax.barh(y_pos, values, color=color_map, edgecolor="white")
         ax.set_yticks(y_pos)
         ax.set_yticklabels(labels)
         ax.invert_yaxis()
         ax.set_xlabel("Contagem")
-        ax.set_title("Tempo total de experiência na engenharia de software")
+        # ax.set_title("Tempo total de experiência na engenharia de software")
 
         # anotar números dentro da barra quando couber
         vmax = values.max() if len(values) else 1
         for bar, val in zip(bars, values):
             pct = (val / total * 100) if total else 0.0
-            label = f"{int(val)} ({pct:.1f}%)"
+            label = f"{pct:.1f}% ({int(val)})"
             inside_threshold = vmax * 0.15
             if val >= inside_threshold:
                 x = val - vmax * 0.02
@@ -194,7 +194,7 @@ def analyze_experiencia(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dic
                 text_color = "white" if luminance < 0.6 else "black"
             except Exception:
                 text_color = "black"
-            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=9)
+            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=12)
 
         plt.tight_layout()
         out_file = out_dir / "experiencia_barras_horizontais.png"

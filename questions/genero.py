@@ -101,8 +101,8 @@ def _orange_shades(base_hex: str, n: int) -> list:
 
 
 def plot_pie(counts: pd.Series, out_dir: Path) -> Optional[Path]:
-    """Gera gráfico de pizza em escala de laranja; mostra número absoluto + porcentagem em cada fatia.
-    Usa legenda à direita para evitar sobreposição do título. Cores graduais: menor -> mais claro, maior -> laranja mais escuro.
+    """Gera gráfico de pizza em escala de laranja; mostra porcentagem + número absoluto em cada fatia.
+    Legenda na parte superior. Cores graduais: menor -> mais claro, maior -> laranja mais escuro.
     """
     try:
         import matplotlib
@@ -112,10 +112,8 @@ def plot_pie(counts: pd.Series, out_dir: Path) -> Optional[Path]:
         return None
 
     # garantir que as três categorias existam na ordem desejada
-    labels = [ "Masculino","Feminino", "Prefiro não responder"]
-    sizes = np.array([float(counts.get(lbl, 0)) for lbl in labels]) if np is not None else \
-            np.array([float(counts.get(lbl, 0)) for lbl in labels]) if 'np' in globals() else \
-            None
+    labels = ["Masculino", "Feminino", "Prefiro não responder"]
+    sizes = np.array([float(counts.get(lbl, 0)) for lbl in labels])
     total = sizes.sum() if sizes is not None and sizes.sum() > 0 else 1.0
 
     # gerar cores a partir do BASE_ORANGE (menor->mais claro, maior->mais escuro)
@@ -130,14 +128,14 @@ def plot_pie(counts: pd.Series, out_dir: Path) -> Optional[Path]:
             color_map[idx] = shades[shade_idx]
         colors = color_map
 
-    explode = [0.03 if (s / total) < 0.05 else 0.0 for s in sizes]
+    explode = [0.05] * len(sizes)
 
     def autopct_fn(pct):
         absolute = int(round(pct * total / 100.0))
-        return f"{absolute}\n{pct:.1f}%"
+        return f"{pct:.1f}%\n({absolute})"
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     wedges, texts, autotexts = ax.pie(
         sizes,
         labels=None,
@@ -145,18 +143,18 @@ def plot_pie(counts: pd.Series, out_dir: Path) -> Optional[Path]:
         startangle=90,
         colors=colors,
         explode=explode,
-        wedgeprops=dict(edgecolor="white", linewidth=0.7),
-        textprops=dict(fontsize=10),
+        wedgeprops={"edgecolor": "white", "linewidth": 0.8},
+        textprops={"fontsize": 20, "fontweight": "bold"},
     )
     ax.axis("equal")
-    # legenda à direita para evitar sobreposição com título
-    legend_labels = [f"{lab} ({int(v)})" for lab, v in zip(labels, sizes)]
-    ax.legend(wedges, legend_labels, title="Gênero", loc="center left", bbox_to_anchor=(1.05, 0.5))
-    ax.set_title("Com qual gênero você se identifica?", y=1.02)
+    # legenda na parte superior (SEM inteiro)
+    legend_labels = [f"{lab}" for lab in labels]
+    ax.legend(wedges, legend_labels, title="", loc="upper center", bbox_to_anchor=(0.5, 1.05), ncol=3, frameon=False, fontsize=20)
 
     # ajustar cor dos textos dentro das fatias para garantir legibilidade
     for autotext, wedge in zip(autotexts, wedges):
-        autotext.set_fontsize(9)
+        autotext.set_fontsize(20)
+        autotext.set_fontweight("normal")
         face = wedge.get_facecolor()  # (r,g,b,a)
         luminance = 0.2126 * face[0] + 0.7152 * face[1] + 0.0722 * face[2]
         autotext.set_color("white" if luminance < 0.6 else "black")
