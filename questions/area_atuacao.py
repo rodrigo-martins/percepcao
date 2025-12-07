@@ -153,29 +153,22 @@ def analyze_area_atuacao(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Di
         y_pos = list(range(len(labels)))
         bars = ax.barh(y_pos, values, color=colors, edgecolor="white")
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(labels)
+        ax.set_yticklabels(labels, fontsize=14)
         ax.invert_yaxis()
-        ax.set_xlabel("Contagem")
-        ax.set_title("Principal área de atuação (engenharia de software)")
+        ax.set_xlabel("Contagem", fontsize=14, fontweight="bold")
+        ax.tick_params(axis='x', labelsize=12)
 
         vmax = values.max() if len(values) else 1
         for bar, val in zip(bars, values):
             pct = (val / total * 100) if total else 0.0
-            label = f"{int(val)} ({pct:.1f}%)"
-            inside_threshold = vmax * 0.15
-            if val >= inside_threshold:
-                x = val - vmax * 0.02
-                ha = "right"
-            else:
-                x = val + vmax * 0.02
-                ha = "left"
-            try:
-                face = bar.get_facecolor()
-                luminance = 0.2126 * face[0] + 0.7152 * face[1] + 0.0722 * face[2]
-                text_color = "white" if luminance < 0.6 else "black"
-            except Exception:
-                text_color = "black"
-            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=9)
+            label = f"{pct:.1f}% ({int(val)})"
+            # Sempre à direita da barra
+            x = val + vmax * 0.02
+            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha="left",
+                   color="black", fontsize=12, fontweight="bold")
+        
+        # Expandir limite do eixo X
+        ax.set_xlim(0, vmax * 1.25)
 
         plt.tight_layout()
         out_file = out_dir / "area_atuacao_barras_horizontais.png"

@@ -139,21 +139,21 @@ def analyze_empresa(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[st
             color_map[idx] = shades[shade_idx]
 
         # plot horizontal bars
-        fig, ax = plt.subplots(figsize=(9, 5))
+        fig, ax = plt.subplots(figsize=(15, 5))
         y_pos = list(range(len(labels)))
         bars = ax.barh(y_pos, values, color=color_map, edgecolor="white")
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(labels)
+        ax.set_yticklabels(labels, fontsize=20)
         ax.invert_yaxis()
-        ax.set_xlabel("Contagem")
-        ax.set_title("Quantos funcionários a empresa possui?")
+        ax.set_xlabel("Contagem", fontsize=20, fontweight="bold")
+        ax.tick_params(axis='x', labelsize=14)
 
         # annotate numbers inside bars when possible
         vmax = values.max() if len(values) else 1
         for bar, val in zip(bars, values):
             pct = (val / total * 100) if total else 0.0
-            label = f"{int(val)} ({pct:.1f}%)"
-            inside_threshold = vmax * 0.15
+            label = f"{pct:.1f}% ({int(val)})"
+            inside_threshold = vmax * 0.2
             if val >= inside_threshold:
                 x = val - vmax * 0.02
                 ha = "right"
@@ -162,11 +162,11 @@ def analyze_empresa(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[st
                 ha = "left"
             try:
                 face = bar.get_facecolor()
-                luminance = 0.2126 * face[0] + 0.7152 * face[1] + 0.0722 * face[2]
+                luminance = 0.3126 * face[0] + 0.7152 * face[1] + 0.0722 * face[2]
                 text_color = "white" if luminance < 0.6 else "black"
             except Exception:
                 text_color = "black"
-            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=9)
+            ax.text(x, bar.get_y() + bar.get_height() / 2, label, va="center", ha=ha, color=text_color, fontsize=20, fontweight="bold")
 
         plt.tight_layout()
         out_file = out_dir / "empresa_barras_horizontais.png"

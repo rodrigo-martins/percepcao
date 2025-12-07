@@ -46,7 +46,7 @@ def criar_heatmap_correlacao(corr_matrix: pd.DataFrame, out_path: Optional[Path]
     fig, ax = plt.subplots(figsize=figsize)
     
     # criar heatmap com anotações, sem cbar
-    sns.heatmap(corr_display, annot=True, fmt=".2f", cmap=cmap, center=0.0,
+    sns.heatmap(corr_display, annot=True, fmt=".3f", cmap=cmap, center=0.0,
                 vmin=-1, vmax=1, ax=ax, cbar=False,
                 annot_kws={"fontsize": annot_fontsize},
                 linewidths=0.5, linecolor="white")
