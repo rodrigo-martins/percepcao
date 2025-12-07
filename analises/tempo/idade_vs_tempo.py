@@ -148,6 +148,7 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
                             out_dir: Path) -> Optional[Path]:
     """
     Cria scatter plot com linha de regressão, estilo laranja.
+    Inclui quadro com teste estatístico de correlação.
     """
     if plt is None or sns is None:
         print("❌ matplotlib/seaborn não disponível")
@@ -155,7 +156,7 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
     
     out_dir.mkdir(parents=True, exist_ok=True)
     
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(14, 10))
     
     # Scatter plot com linha de regressão
     sns.regplot(
@@ -167,7 +168,7 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
             "alpha": 0.6,
             "color": BASE_ORANGE,
             "edgecolor": "white",
-            "linewidths": 0.5,  # CORRIGIDO: linewidths (não linewidth)
+            "linewidths": 0.5,
         },
         line_kws={
             "color": BASE_ORANGE,
@@ -177,17 +178,17 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
     )
     
     # Títulos e labels
-    # ax.set_title(
-    #     "Correlação: Idade vs. Percepção de Prejuízo ao Tempo Pessoal",
-    #     fontsize=18,
-    #     fontweight="bold",
-    #     pad=20,
-    # )
-    ax.set_xlabel("Idade (anos)", fontsize=16, fontweight="bold")
-    ax.set_ylabel("Score Q6 (1-5)", fontsize=16, fontweight="bold")
+    ax.set_title(
+        "Correlação: Idade vs. Q6 (Carga horária prejudicou tempo pessoal)",
+        fontsize=18,
+        fontweight="bold",
+        pad=20,
+    )
+    ax.set_xlabel("Idade (anos)", fontsize=20, fontweight="bold")
+    ax.set_ylabel("Q6 (Concordância 1-5)", fontsize=20, fontweight="bold")
     
     # Aumentar tamanho dos ticks
-    ax.tick_params(axis='both', labelsize=14)
+    ax.tick_params(axis='both', labelsize=18)
     
     # Grid
     ax.grid(True, alpha=0.3, linestyle='--')
@@ -198,27 +199,39 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
     n = stats_dict["n"]
     
     # Determinar significância
-    sig_text = ""
     if pval < 0.001:
-        sig_text = "***"
+        sig_symbol = "***"
+        sig_text = "Altamente significativo"
     elif pval < 0.01:
-        sig_text = "**"
+        sig_symbol = "**"
+        sig_text = "Muito significativo"
     elif pval < 0.05:
-        sig_text = "*"
+        sig_symbol = "*"
+        sig_text = "Significativo"
     else:
-        sig_text = "ns"  # não significativo
+        sig_symbol = "ns"
+        sig_text = "Não significativo"
     
-    annotation = f"r = {r:.4f}\np-valor = {pval:.6f} {sig_text}\nn = {n}"
+    # Criar quadro conciso de estatísticas
+    quadro_text = (
+        f"Correlação de Spearman\n"
+        f"{'─' * 32}\n"
+        f"r = {r:.4f}\n"
+        f"p = {pval:.6f}\n"
+        f"n = {n}\n"
+        f"Resultado: {sig_symbol} {sig_text}"
+    )
     
     ax.text(
         0.05,
         0.95,
-        annotation,
+        quadro_text,
         transform=ax.transAxes,
-        fontsize=14,
+        fontsize=16,
         fontweight="bold",
         verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8, edgecolor=BASE_ORANGE, linewidth=2),
+        fontfamily="monospace",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8, edgecolor="black", linewidth=2),
         color="black",
     )
     
@@ -238,7 +251,7 @@ def analyze_idade_vs_tempo(csv_path: Optional[Path] = None,
     """
     Pipeline completo: carrega dados, calcula correlação e gera scatter plot.
     """
-    project_root = Path(__file__).resolve().parents[1]
+    project_root = Path(__file__).resolve().parents[2]  # CORRIGIDO: .parents[1] → .parents[2]
     
     csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "ordered.csv"
     out_dir = Path(out_dir) if out_dir is not None else project_root / "output"

@@ -1,0 +1,58 @@
+TESTE DE KRUSKAL-WALLIS - Q6 por Grupos de Idade
+================================================================================
+
+Hipótese Nula (H0): As distribuições de Q6 são iguais entre todos os grupos
+Hipótese Alternativa (H1): Pelo menos um grupo tem distribuição diferente
+
+QUADRO DE ESTATÍSTICAS DESCRITIVAS POR GRUPO
+--------------------------------------------------------------------------------
+Grupo   n Média Mediana Desvio Padrão Mín Máx
+   Q1  77  2.26    2.00          1.31   1   5
+Q2+Q3 143  2.50    2.00          1.29   1   5
+   Q4  62  2.66    2.00          1.21   1   5
+
+QUADRO DE TESTE ESTATÍSTICO
+--------------------------------------------------------------------------------
+Teste Estatístico: Kruskal-Wallis
+Estatística H: 4.3614
+P-valor: 0.112962
+Nível de significância (α): 0.05
+Resultado: ns
+Interpretação: ns   (Não significativo)
+
+================================================================================
+LEGENDA DE SIGNIFICÂNCIA
+================================================================================
+ns  = Não significativo (p ≥ 0.05)
+*   = Significativo (p < 0.05)
+**  = Muito significativo (p < 0.01)
+*** = Altamente significativo (p < 0.001)
+
+CONCLUSÃO: Falha em rejeitar H0
+→ Não há diferença significativa na percepção (Q6) entre os grupos de idade
+
+================================================================================
+ESTATÍSTICAS DESCRITIVAS DETALHADAS POR GRUPO
+================================================================================
+
+Q1:
+  n = 77
+  Média = 2.26
+  Mediana = 2.00
+  Std = 1.30
+  Min = 1, Max = 5
+
+Q2+Q3:
+  n = 143
+  Média = 2.50
+  Mediana = 2.00
+  Std = 1.29
+  Min = 1, Max = 5
+
+Q4:
+  n = 62
+  Média = 2.66
+  Mediana = 2.00
+  Std = 1.20
+  Min = 1, Max = 5
+

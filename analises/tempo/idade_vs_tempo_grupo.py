@@ -188,6 +188,7 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
     """
     Cria boxplot com paleta laranja mostrando distribuição de Q6 por grupos de idade.
     Grupos: Q1 (escuro), Q2+Q3 (médio), Q4 (claro)
+    Inclui quadro com teste estatístico de significância.
     """
     if plt is None or sns is None:
         print("❌ matplotlib/seaborn não disponível")
@@ -199,7 +200,7 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
     n_groups = 3
     orange_palette = _orange_shades(BASE_ORANGE, n_groups)
     
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(14, 10))
     
     # Plotar boxplot com Q6
     bp = sns.boxplot(
@@ -231,8 +232,8 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
     )
     
     # Adicionar valores das médias como texto
-    # Q1 (escuro) = preto, Q2+Q3 (médio) = preto, Q4 (claro) = branco
-    text_colors = {"Q1": "black", "Q2+Q3": "black", "Q4": "white"}
+    # Q1 (escuro) = branco, Q2+Q3 (médio) = branco, Q4 (claro) = preto
+    text_colors = {"Q1": "white", "Q2+Q3": "white", "Q4": "black"}
     
     for pos, (group, mean_val) in enumerate(means.items()):
         text_color = text_colors.get(group, "black")
@@ -243,7 +244,7 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
             f"{mean_val:.2f}",
             ha="center",
             va="bottom",
-            fontsize=12,
+            fontsize=20,
             fontweight="bold",
             color=text_color
         )
@@ -255,29 +256,76 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
         if mask.any():
             min_age = df_clean.loc[mask, "idade"].min()
             max_age = df_clean.loc[mask, "idade"].max()
-            label = f"{group}\n({int(min_age)}-{int(max_age)})"
+            n_respondentes = mask.sum()
+            label = f"{group} ({int(min_age)}-{int(max_age)})\n(n={n_respondentes})"
             group_labels.append(label)
     
     # Configurar títulos e labels
-    ax.set_xlabel("Grupos de Idade", fontsize=16, fontweight="bold")
-    ax.set_xticklabels(group_labels, fontsize=12)
-    ax.set_ylabel("Q6 (A carga horária... prejudicou meu tempo pessoal...)", fontsize=14, fontweight="bold")
+    ax.set_xlabel("Grupos de Idade", fontsize=20, fontweight="bold")
+    ax.set_xticklabels(group_labels, fontsize=14)
+    ax.set_ylabel("Q6 (Carga horária prejudicou tempo pessoal)", fontsize=20, fontweight="bold")
     # ax.set_title(
-    #     "Distribuição da Percepção (Q6) por Grupos de Idade",
+    #     "Distribuição por Grupos de Idade: Q6 (Carga horária)",
     #     fontsize=18,
     #     fontweight="bold",
     #     pad=20
     # )
     
     # Aumentar tamanho dos ticks
-    ax.tick_params(axis="both", labelsize=14)
+    ax.tick_params(axis="both", labelsize=18)
     
     # Grid
     ax.grid(axis="y", alpha=0.3, linestyle="--")
     ax.set_ylim(0.5, 5.5)
     
     # Legenda
-    ax.legend(loc="upper right", fontsize=12)
+    ax.legend(loc="upper right", fontsize=16)
+    
+    # Calcular estatísticas para o quadro
+    grupos = {}
+    for group in ["Q1", "Q2+Q3", "Q4"]:
+        subset = df_clean[df_clean["Faixa_Etaria"] == group]["q6"].values
+        if len(subset) >= 5:
+            grupos[group] = subset
+    
+    if len(grupos) >= 2:
+        # Teste de Kruskal-Wallis
+        h_stat, p_valor = stats.kruskal(*grupos.values())
+        
+        # Determinar significância
+        if p_valor < 0.001:
+            sig_symbol = "***"
+            sig_text = "Altamente significativo"
+        elif p_valor < 0.01:
+            sig_symbol = "**"
+            sig_text = "Muito significativo"
+        elif p_valor < 0.05:
+            sig_symbol = "*"
+            sig_text = "Significativo"
+        else:
+            sig_symbol = "ns"
+            sig_text = "Não significativo"
+        
+        # Criar quadro conciso de estatísticas
+        quadro_text = (
+            f"Teste de Kruskal-Wallis\n"
+            f"{'─' * 32}\n"
+            f"H = {h_stat:.4f}\n"
+            f"p = {p_valor:.6f}\n"
+            f"Resultado: {sig_symbol} {sig_text}"
+        )
+        
+        # Adicionar quadro ao gráfico
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.8, edgecolor='black', linewidth=2)
+        ax.text(
+            0.02, 0.95,
+            quadro_text,
+            transform=ax.transAxes,
+            fontsize=18,
+            verticalalignment='top',
+            fontfamily='monospace',
+            bbox=props
+        )
     
     plt.tight_layout()
     
@@ -293,10 +341,10 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
 def analise_idade_vs_tempo_grupo(csv_path: Optional[Path] = None,
                                   out_dir: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Pipeline completo: carrega dados, cria grupos e plota boxplot.
+    Pipeline completo: carrega dados, cria grupos e plota boxplot com teste estatístico.
     """
-    project_root = Path(__file__).resolve().parents[1]
-    
+    project_root = Path(__file__).resolve().parents[2]
+     
     csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "ordered.csv"
     out_dir = Path(out_dir) if out_dir is not None else project_root / "output"
     
@@ -315,11 +363,41 @@ def analise_idade_vs_tempo_grupo(csv_path: Optional[Path] = None,
     # Plotar boxplot
     boxplot_path = plot_boxplot_quartis(df_clean, out_dir)
     
-    # Estatísticas descritivas
-    print(f"\n📈 Estatísticas por Grupo:")
+    # Criar quadro com estatísticas por grupo
+    print(f"\n📋 QUADRO DE ESTATÍSTICAS DESCRITIVAS POR GRUPO (Q6)")
+    print(f"{'=' * 100}")
+    
+    stats_data = []
     for group in ["Q1", "Q2+Q3", "Q4"]:
         subset = df_clean[df_clean["Faixa_Etaria"] == group]["q6"]
         if len(subset) > 0:
+            stats_data.append({
+                "Grupo": group,
+                "n": len(subset),
+                "Média": f"{subset.mean():.2f}",
+                "Mediana": f"{subset.median():.2f}",
+                "Desvio Padrão": f"{subset.std():.2f}",
+                "Mín": f"{subset.min():.0f}",
+                "Máx": f"{subset.max():.0f}",
+            })
+    
+    stats_df = pd.DataFrame(stats_data)
+    print(stats_df.to_string(index=False))
+    print(f"{'=' * 100}\n")
+    
+    # Teste de Kruskal-Wallis
+    print(f"\n🔬 TESTE DE KRUSKAL-WALLIS (ANOVA Não-paramétrica)")
+    print(f"{'=' * 80}")
+    print(f"Hipótese Nula (H0): As distribuições de Q6 são iguais entre todos os grupos")
+    print(f"Hipótese Alternativa (H1): Pelo menos um grupo tem distribuição diferente")
+    print(f"{'=' * 80}\n")
+    
+    # Preparar grupos
+    grupos = {}
+    for group in ["Q1", "Q2+Q3", "Q4"]:
+        subset = df_clean[df_clean["Faixa_Etaria"] == group]["q6"]
+        if len(subset) > 0:
+            grupos[group] = subset.values
             print(f"\n  {group}:")
             print(f"    n = {len(subset)}")
             print(f"    média = {subset.mean():.2f}")
@@ -327,12 +405,125 @@ def analise_idade_vs_tempo_grupo(csv_path: Optional[Path] = None,
             print(f"    std = {subset.std():.2f}")
             print(f"    min = {subset.min():.0f}, max = {subset.max():.0f}")
     
+    if len(grupos) >= 2:
+        # Executar teste de Kruskal-Wallis
+        h_stat, p_valor = stats.kruskal(*grupos.values())
+        
+        print(f"\n\nNúmero de grupos: {len(grupos)}")
+        print(f"Total de observações: {sum(len(v) for v in grupos.values())}\n")
+        
+        print(f"Estatística H (Kruskal-Wallis): {h_stat:.4f}")
+        print(f"P-valor: {p_valor:.6f}")
+        print(f"Nível de significância (α): 0.05\n")
+        
+        # Interpretação
+        if p_valor < 0.001:
+            sig_level = "***  (Altamente significativo)"
+            sig_symbol = "***"
+        elif p_valor < 0.01:
+            sig_level = "**   (Muito significativo)"
+            sig_symbol = "**"
+        elif p_valor < 0.05:
+            sig_level = "*    (Significativo)"
+            sig_symbol = "*"
+        else:
+            sig_level = "ns   (Não significativo)"
+            sig_symbol = "ns"
+        
+        print(f"Resultado: {sig_level}")
+        
+        # Criar quadro de significância
+        print(f"\n\n📊 QUADRO DE TESTE ESTATÍSTICO")
+        print(f"{'=' * 80}")
+        test_summary = pd.DataFrame({
+            "Teste Estatístico": ["Kruskal-Wallis"],
+            "Estatística H": [f"{h_stat:.4f}"],
+            "P-valor": [f"{p_valor:.6f}"],
+            "α (significância)": ["0.05"],
+            "Resultado": [sig_symbol],
+            "Interpretação": [sig_level.split("(")[0].strip()]
+        })
+        print(test_summary.to_string(index=False))
+        print(f"{'=' * 80}\n")
+        
+        # Legenda de significância
+        print(f"📌 LEGENDA DE SIGNIFICÂNCIA:")
+        print(f"   ns  = Não significativo (p ≥ 0.05)")
+        print(f"   *   = Significativo (p < 0.05)")
+        print(f"   **  = Muito significativo (p < 0.01)")
+        print(f"   *** = Altamente significativo (p < 0.001)\n")
+        
+        if p_valor < 0.05:
+            print(f"\n✅ CONCLUSÃO: Rejeita-se H0")
+            print(f"   → Existe diferença significativa na percepção (Q6) entre os grupos de idade")
+            print(f"   → Os grupos de idade diferem em relação ao grau de concordância sobre")
+            print(f"     carga horária prejudicar tempo pessoal")
+        else:
+            print(f"\n❌ CONCLUSÃO: Falha em rejeitar H0")
+            print(f"   → Não há diferença significativa na percepção (Q6) entre os grupos de idade")
+            print(f"   → Os grupos de idade têm distribuições semelhantes de resposta")
+        
+        # Salvar resultados em arquivo
+        results_path = out_dir / "kruskal_wallis_idade_q6.txt"
+        with open(results_path, "w", encoding="utf-8") as f:
+            f.write("TESTE DE KRUSKAL-WALLIS - Q6 por Grupos de Idade\n")
+            f.write("=" * 80 + "\n\n")
+            f.write("Hipótese Nula (H0): As distribuições de Q6 são iguais entre todos os grupos\n")
+            f.write("Hipótese Alternativa (H1): Pelo menos um grupo tem distribuição diferente\n\n")
+            
+            # Quadro de estatísticas descritivas
+            f.write("QUADRO DE ESTATÍSTICAS DESCRITIVAS POR GRUPO\n")
+            f.write("-" * 80 + "\n")
+            f.write(stats_df.to_string(index=False))
+            f.write("\n\n")
+            
+            # Quadro de teste estatístico
+            f.write("QUADRO DE TESTE ESTATÍSTICO\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"Teste Estatístico: Kruskal-Wallis\n")
+            f.write(f"Estatística H: {h_stat:.4f}\n")
+            f.write(f"P-valor: {p_valor:.6f}\n")
+            f.write(f"Nível de significância (α): 0.05\n")
+            f.write(f"Resultado: {sig_symbol}\n")
+            f.write(f"Interpretação: {sig_level}\n\n")
+            
+            f.write("=" * 80 + "\n")
+            f.write("LEGENDA DE SIGNIFICÂNCIA\n")
+            f.write("=" * 80 + "\n")
+            f.write("ns  = Não significativo (p ≥ 0.05)\n")
+            f.write("*   = Significativo (p < 0.05)\n")
+            f.write("**  = Muito significativo (p < 0.01)\n")
+            f.write("*** = Altamente significativo (p < 0.001)\n\n")
+            
+            if p_valor < 0.05:
+                f.write("CONCLUSÃO: Rejeita-se H0\n")
+                f.write("→ Existe diferença significativa na percepção (Q6) entre os grupos de idade\n")
+            else:
+                f.write("CONCLUSÃO: Falha em rejeitar H0\n")
+                f.write("→ Não há diferença significativa na percepção (Q6) entre os grupos de idade\n")
+            
+            f.write("\n" + "=" * 80 + "\n")
+            f.write("ESTATÍSTICAS DESCRITIVAS DETALHADAS POR GRUPO\n")
+            f.write("=" * 80 + "\n\n")
+            
+            for group in ["Q1", "Q2+Q3", "Q4"]:
+                subset = grupos.get(group)
+                if subset is not None:
+                    f.write(f"{group}:\n")
+                    f.write(f"  n = {len(subset)}\n")
+                    f.write(f"  Média = {subset.mean():.2f}\n")
+                    f.write(f"  Mediana = {np.median(subset):.2f}\n")
+                    f.write(f"  Std = {subset.std():.2f}\n")
+                    f.write(f"  Min = {subset.min():.0f}, Max = {subset.max():.0f}\n\n")
+        
+        print(f"\n📄 Resultados salvos em: {results_path}")
+     
     return {
         "status": "ok",
         "n_total": len(df_clean),
         "n_groups": prep_info["n_groups"],
-         "boxplot_path": boxplot_path,
-         "df_clean": df_clean,
+        "boxplot_path": boxplot_path,
+        "df_clean": df_clean,
      }
 
 

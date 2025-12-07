@@ -1,0 +1,119 @@
+TESTE DE KRUSKAL-WALLIS - Q10 por Estado
+================================================================================
+
+Hipótese Nula (H0): As distribuições de Q10 são iguais entre todos os estados
+Hipótese Alternativa (H1): Pelo menos um estado tem distribuição diferente
+
+Estatística H: 30.3999
+P-valor: 0.004123
+Nível de significância (α): 0.05
+Número de estados: 14
+Total de observações: 272
+
+Resultado: **   (Muito significativo)
+
+CONCLUSÃO: Rejeita-se H0
+→ Existe diferença significativa na concordância (Q10) entre os estados
+
+================================================================================
+ESTATÍSTICAS DESCRITIVAS POR ESTADO (Q10)
+================================================================================
+
+AL (Alagoas):
+  n = 6
+  Média = 3.33
+  Mediana = 3.50
+  Std = 1.11
+  Min = 2, Max = 5
+
+AM (Amazonas):
+  n = 10
+  Média = 2.90
+  Mediana = 3.00
+  Std = 1.51
+  Min = 1, Max = 5
+
+CE (Ceará):
+  n = 14
+  Média = 3.64
+  Mediana = 3.50
+  Std = 1.34
+  Min = 1, Max = 5
+
+DF (Distrito Federal):
+  n = 5
+  Média = 4.00
+  Mediana = 4.00
+  Std = 0.63
+  Min = 3, Max = 5
+
+GO (Goiás):
+  n = 5
+  Média = 2.80
+  Mediana = 3.00
+  Std = 0.75
+  Min = 2, Max = 4
+
+MG (Minas Gerais):
+  n = 6
+  Média = 1.67
+  Mediana = 2.00
+  Std = 0.47
+  Min = 1, Max = 2
+
+PR (Paraná):
+  n = 12
+  Média = 3.00
+  Mediana = 3.50
+  Std = 1.29
+  Min = 1, Max = 5
+
+PB (Paraíba):
+  n = 6
+  Média = 4.17
+  Mediana = 4.00
+  Std = 0.69
+  Min = 3, Max = 5
+
+PE (Pernambuco):
+  n = 98
+  Média = 3.18
+  Mediana = 3.00
+  Std = 1.25
+  Min = 1, Max = 5
+
+RS (Rio Grande do Sul):
+  n = 16
+  Média = 3.19
+  Mediana = 3.50
+  Std = 1.42
+  Min = 1, Max = 5
+
+RJ (Rio de Janeiro):
+  n = 14
+  Média = 3.64
+  Mediana = 4.00
+  Std = 1.04
+  Min = 2, Max = 5
+
+SC (Santa Catarina):
+  n = 13
+  Média = 3.69
+  Mediana = 4.00
+  Std = 0.99
+  Min = 2, Max = 5
+
+SE (Sergipe):
+  n = 7
+  Média = 4.71
+  Mediana = 5.00
+  Std = 0.70
+  Min = 3, Max = 5
+
+SP (São Paulo):
+  n = 60
+  Média = 3.48
+  Mediana = 4.00
+  Std = 1.18
+  Min = 1, Max = 5
+
