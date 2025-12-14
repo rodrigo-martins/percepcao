@@ -10,11 +10,13 @@ try:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.colors as mcolors
+    import matplotlib.patheffects as path_effects
     import seaborn as sns
 except Exception:
     plt = None
     sns = None
     mcolors = None
+    path_effects = None
 
 from scipy import stats
 
@@ -36,18 +38,18 @@ LIKERT_MAP = {
     "Discordo totalmente": 1,
 }
 
-# Mapeamento de Estado para Sigla
-ESTADO_SIGLA = {
-    'Acre': 'AC', 'Amapá': 'AP', 'Amazonas': 'AM', 'Pará': 'PA',
-    'Rondônia': 'RO', 'Roraima': 'RR', 'Tocantins': 'TO',
-    'Alagoas': 'AL', 'Bahia': 'BA', 'Ceará': 'CE',
-    'Maranhão': 'MA', 'Paraíba': 'PB', 'Pernambuco': 'PE',
-    'Piauí': 'PI', 'Rio Grande do Norte': 'RN', 'Sergipe': 'SE',
-    'Distrito Federal': 'DF', 'Goiás': 'GO',
-    'Mato Grosso': 'MT', 'Mato Grosso do Sul': 'MS',
-    'Espírito Santo': 'ES', 'Minas Gerais': 'MG',
-    'Rio de Janeiro': 'RJ', 'São Paulo': 'SP',
-    'Paraná': 'PR', 'Rio Grande do Sul': 'RS', 'Santa Catarina': 'SC'
+# Mapeamento de Estados para Regiões
+REGION_MAP = {
+    'Acre': 'Norte', 'Amapá': 'Norte', 'Amazonas': 'Norte', 'Pará': 'Norte', 
+    'Rondônia': 'Norte', 'Roraima': 'Norte', 'Tocantins': 'Norte',
+    'Alagoas': 'Nordeste', 'Bahia': 'Nordeste', 'Ceará': 'Nordeste', 
+    'Maranhão': 'Nordeste', 'Paraíba': 'Nordeste', 'Pernambuco': 'Nordeste', 
+    'Piauí': 'Nordeste', 'Rio Grande do Norte': 'Nordeste', 'Sergipe': 'Nordeste',
+    'Distrito Federal': 'Centro-Oeste', 'Goiás': 'Centro-Oeste', 
+    'Mato Grosso': 'Centro-Oeste', 'Mato Grosso do Sul': 'Centro-Oeste',
+    'Espírito Santo': 'Sudeste', 'Minas Gerais': 'Sudeste', 
+    'Rio de Janeiro': 'Sudeste', 'São Paulo': 'Sudeste',
+    'Paraná': 'Sul', 'Rio Grande do Sul': 'Sul', 'Santa Catarina': 'Sul'
 }
 
 
@@ -83,8 +85,7 @@ def clean_estado(estado_str: str) -> Optional[str]:
 
 def load_and_prepare(csv_path: Path) -> Tuple[Optional[pd.DataFrame], Optional[Dict]]:
     """
-    Carrega CSV, mapeia Q7 e Estado para numérico/string.
-    Filtra apenas estados com n >= 5 respostas.
+    Carrega CSV, mapeia Q10 e Estado para numérico/string, cria coluna Região.
     Retorna: (df_clean, stats_dict)
     """
     try:
@@ -95,47 +96,56 @@ def load_and_prepare(csv_path: Path) -> Tuple[Optional[pd.DataFrame], Optional[D
     
     print(f"✓ CSV carregado: {df.shape[0]} linhas, {df.shape[1]} colunas")
     
-    # Encontrar coluna Q7 (competitividade) e Estado
-    q7_col = None
+    # Encontrar coluna Q10 (tempo suficiente) e Estado
+    q10_col = None
     estado_col = None
     
     for col in df.columns:
         col_lower = str(col).lower().strip()
         
-        # Procurar por Q7 (competitividade no mercado)
-        if col_lower.startswith("[") and "competitivo" in col_lower:
-            q7_col = col
+        # Procurar por Q10 (tempo suficiente)
+        if col_lower.startswith("[") and "tempo suficiente" in col_lower:
+            q10_col = col
         
         # Procurar por Estado - ser mais flexível
         if "estado" in col_lower:
             estado_col = col
     
-    if q7_col is None or estado_col is None:
+    if q10_col is None or estado_col is None:
         print(f"❌ Colunas não encontradas!")
-        print(f"   Q7 (competitividade): {q7_col}")
+        print(f"   Q10 (tempo suficiente): {q10_col}")
         print(f"   Estado: {estado_col}")
         print(f"\n🔍 Colunas disponíveis (primeiras 20):")
         for i, col in enumerate(df.columns[:20]):
+            col_lower = str(col).lower()
             starts_bracket = "[" if str(col).strip().startswith("[") else " "
             print(f"   {starts_bracket} {i:2d}: {repr(col)}")
         return None, None
     
-    print(f"✓ Q7 coluna: {repr(q7_col)}")
+    print(f"✓ Q10 coluna: {repr(q10_col)}")
     print(f"✓ Estado coluna: {repr(estado_col)}")
     
     # Preparar dados
-    df_clean = df[[estado_col, q7_col]].copy()
-    df_clean.columns = ["estado", "q7"]
+    df_clean = df[[estado_col, q10_col]].copy()
+    df_clean.columns = ["estado", "q10"]
     
-    # Mapear Q7 para numérico
-    df_clean["q7"] = df_clean["q7"].map(LIKERT_MAP)
-    df_clean["q7"] = pd.to_numeric(df_clean["q7"], errors="coerce")
+    print(f"\n[DEBUG] Primeiras 5 valores de estado:")
+    print(df_clean["estado"].head())
+    print(f"\n[DEBUG] Primeiras 5 valores de q10:")
+    print(df_clean["q10"].head())
+    
+    # Mapear Q10 para numérico
+    df_clean["q10"] = df_clean["q10"].map(LIKERT_MAP)
+    df_clean["q10"] = pd.to_numeric(df_clean["q10"], errors="coerce")
     
     # Limpar Estado
     df_clean["estado"] = df_clean["estado"].apply(clean_estado)
     
+    print(f"\n[DEBUG] Primeiras 5 valores de estado após limpeza:")
+    print(df_clean["estado"].head())
+    
     # Remover NaNs
-    df_clean = df_clean.dropna(subset=["estado", "q7"])
+    df_clean = df_clean.dropna(subset=["estado", "q10"])
     
     print(f"✓ Dados limpos: {len(df_clean)} linhas válidas")
     
@@ -143,41 +153,40 @@ def load_and_prepare(csv_path: Path) -> Tuple[Optional[pd.DataFrame], Optional[D
         print(f"❌ Dados insuficientes para análise (n={len(df_clean)})")
         return None, None
     
-    # Converter Estado para Sigla
-    df_clean["estado_sigla"] = df_clean["estado"].map(ESTADO_SIGLA)
+    # Debug: mostrar estados únicos encontrados
+    print(f"\n[DEBUG] Estados encontrados:")
+    print(df_clean["estado"].unique())
+    
+    # Mapear Estado para Região
+    df_clean["Regiao"] = df_clean["estado"].map(REGION_MAP)
     
     # Remover estados não mapeados
     n_before = len(df_clean)
-    df_clean = df_clean.dropna(subset=["estado_sigla"])
+    df_clean = df_clean.dropna(subset=["Regiao"])
     n_after = len(df_clean)
     
-    print(f"✓ Estados mapeados: {n_after} linhas válidas ({n_before - n_after} não mapeados)")
+    print(f"✓ Regiões mapeadas: {n_after} linhas válidas ({n_before - n_after} não mapeados)")
     
-    # Filtrar estados com n >= 5 respostas
-    estado_counts = df_clean["estado"].value_counts()
-    estados_validos = estado_counts[estado_counts >= 5].index.tolist()
+    if n_after == 0:
+        print(f"❌ Nenhum estado foi mapeado para região!")
+        print(f"Estados não mapeados:")
+        print(df_clean[df_clean["Regiao"].isna()]["estado"].unique())
+        return None, None
     
-    n_before_filter = len(df_clean)
-    df_clean = df_clean[df_clean["estado"].isin(estados_validos)]
-    n_after_filter = len(df_clean)
+    print(f"\n📊 Distribuição por Região:")
+    for regiao in sorted(df_clean["Regiao"].unique()):
+        count = (df_clean["Regiao"] == regiao).sum()
+        mean = df_clean[df_clean["Regiao"] == regiao]["q10"].mean()
+        print(f"   {regiao}: {count} respondentes, média = {mean:.2f}")
     
-    print(f"\n✓ Filtro n >= 5: {n_after_filter} linhas válidas ({n_before_filter - n_after_filter} removidas)")
-    print(f"✓ Estados mantidos: {len(estados_validos)}")
-     
-    print(f"\n📊 Distribuição por Estado:")
-    for estado in sorted(df_clean["estado"].unique()):
-        sigla = ESTADO_SIGLA.get(estado, "??")
-        count = (df_clean["estado"] == estado).sum()
-        mean = df_clean[df_clean["estado"] == estado]["q7"].mean()
-        print(f"   {sigla}: {count} respondentes, média = {mean:.2f}")
-    
-    return df_clean, {"n_states": df_clean["estado"].nunique()}
+    return df_clean, {"n_regions": df_clean["Regiao"].nunique()}
 
 
-def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]:
+def plot_boxplot_regions(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]:
     """
-    Cria boxplot com paleta laranja mostrando distribuição de Q7 por estado.
-    Estados ordenados da maior para menor média.
+    Cria boxplot com paleta laranja mostrando distribuição de Q10 por região.
+    Inclui quadro com estatísticas e significância.
+    Regiões ordenadas da menor para maior média.
     """
     if plt is None or sns is None:
         print("❌ matplotlib/seaborn não disponível")
@@ -185,31 +194,30 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
     
     out_dir.mkdir(parents=True, exist_ok=True)
     
-    # Calcular médias por estado
-    state_means = df_clean.groupby("estado")["q7"].mean().sort_values(ascending=False)
-    state_order = state_means.index.tolist()
+    # Calcular médias por região e ordenar (menor → maior)
+    region_means = df_clean.groupby("Regiao")["q10"].mean().sort_values(ascending=True)
+    region_order = region_means.index.tolist()
     
-    print(f"\n📈 Ordem dos estados (maior → menor média):")
-    for i, estado in enumerate(state_order, 1):
-        sigla = ESTADO_SIGLA.get(estado, "??")
-        print(f"   {i:2d}. {sigla} ({estado}): {state_means[estado]:.2f}")
+    print(f"\n📈 Ordem das regiões (menor → maior média):")
+    for i, regiao in enumerate(region_order, 1):
+        print(f"   {i}. {regiao}: {region_means[regiao]:.2f}")
     
-    # Gerar paleta de laranja (estados em ordem)
-    n_states = len(state_order)
-    orange_palette = _orange_shades(BASE_ORANGE, n_states)
+    # Gerar paleta de laranja (regiões em ordem)
+    n_regions = len(region_order)
+    orange_palette = _orange_shades(BASE_ORANGE, n_regions)
     
     # Criar dicionário de cores baseado na ordem
-    color_dict = {estado: orange_palette[i] for i, estado in enumerate(state_order)}
+    color_dict = {regiao: orange_palette[i] for i, regiao in enumerate(region_order)}
     
-    fig, ax = plt.subplots(figsize=(18, 10))
+    fig, ax = plt.subplots(figsize=(16, 10))
     
     # Plotar boxplot
     bp = sns.boxplot(
         data=df_clean,
-        x="estado",
-        y="q7",
-        order=state_order,
-        hue="estado",
+        x="Regiao",
+        y="q10",
+        order=region_order,
+        hue="Regiao",
         palette=color_dict,
         legend=False,
         ax=ax,
@@ -218,10 +226,10 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
     )
     
     # Calcular e plotar médias como bolinhas pretas
-    means = df_clean.groupby("estado", observed=True)["q7"].mean()
-    positions = range(len(state_order))
+    means = df_clean.groupby("Regiao", observed=True)["q10"].mean()
+    positions = range(len(region_order))
     
-    means_ordered = [means[estado] for estado in state_order]
+    means_ordered = [means[regiao] for regiao in region_order]
     
     ax.scatter(
         positions,
@@ -236,42 +244,38 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
     )
     
     # Adicionar valores das médias como texto
-    # Cor do texto: preto para estados escuros (maior média), branco para claros
-    for pos, estado in enumerate(state_order):
+    for pos, regiao in enumerate(region_order):
         mean_val = means_ordered[pos]
-        # Primeiros 30% (mais escuros) = preto, resto = branco
-        threshold = int(len(state_order) * 0.7)
-        text_color = "black" if pos < threshold else "white"
         
-        ax.text(
+        text = ax.text(
             pos,
             mean_val + 0.15,
             f"{mean_val:.2f}",
             ha="center",
             va="bottom",
-            fontsize=16,
+            fontsize=20,
             fontweight="bold",
-            color=text_color
+            color="black"
         )
+        
+        # Adicionar borda branca
+        if path_effects is not None:
+            text.set_path_effects([
+                path_effects.Stroke(linewidth=3, foreground='white'),
+                path_effects.Normal()
+            ])
     
-    # Criar rótulos com sigla e n de cada estado
-    state_labels = []
-    for estado in state_order:
-        sigla = ESTADO_SIGLA.get(estado, "??")
-        n_respondentes = (df_clean["estado"] == estado).sum()
-        label = f"{sigla}\n(n={n_respondentes})"
-        state_labels.append(label)
+    # Criar rótulos com n de cada região
+    region_labels = []
+    for regiao in region_order:
+        n_respondentes = (df_clean["Regiao"] == regiao).sum()
+        label = f"{regiao}\n(n={n_respondentes})"
+        region_labels.append(label)
     
     # Configurar títulos e labels
-    ax.set_xlabel("Estado", fontsize=20, fontweight="bold")
-    ax.set_xticklabels(state_labels, fontsize=16)
-    ax.set_ylabel("Q7 (Manter-se competitivo)", fontsize=20, fontweight="bold")
-    # ax.set_title(
-    #     "Distribuição por Estado: Q7 (Manter se competitivo)",
-    #     fontsize=20,
-    #     fontweight="bold",
-    #     pad=20
-    # )
+    ax.set_xlabel("Região do Brasil", fontsize=20, fontweight="bold")
+    ax.set_xticklabels(region_labels, fontsize=16)
+    ax.set_ylabel("Q10 (Tempo no expediente)", fontsize=20, fontweight="bold")
     
     # Aumentar tamanho dos ticks
     ax.tick_params(axis="both", labelsize=20)
@@ -285,10 +289,10 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
     
     # Calcular estatísticas para o quadro
     grupos = {}
-    for estado in df_clean["estado"].unique():
-        subset = df_clean[df_clean["estado"] == estado]["q7"].values
+    for regiao in df_clean["Regiao"].unique():
+        subset = df_clean[df_clean["Regiao"] == regiao]["q10"].values
         if len(subset) >= 5:
-            grupos[estado] = subset
+            grupos[regiao] = subset
     
     if len(grupos) >= 2:
         # Teste de Kruskal-Wallis
@@ -312,6 +316,7 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
         quadro_text = (
             f"Teste de Kruskal-Wallis\n"
             f"{'─' * 32}\n"
+            f"n = {sum(len(g) for g in grupos.values())}\n"
             f"H = {h_stat:.4f}\n"
             f"p = {p_valor:.6f}\n"
             f"Resultado: {sig_symbol} {sig_text}"
@@ -320,11 +325,12 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
         # Adicionar quadro ao gráfico
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.8, edgecolor='black', linewidth=2)
         ax.text(
-            0.02, 0.05,
+            0.98, 0.02,
             quadro_text,
             transform=ax.transAxes,
             fontsize=20,
             verticalalignment='bottom',
+            horizontalalignment='right',
             fontfamily='monospace',
             bbox=props
         )
@@ -332,7 +338,8 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
     plt.tight_layout()
     
     # Salvar figura
-    out_path = out_dir / "state_analysis_Q7.png"
+    script_name = Path(__file__).stem
+    out_path = out_dir / f"{script_name}.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     
@@ -340,14 +347,14 @@ def plot_boxplot_states(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path]
     return out_path
 
 
-def analise_competitividade_estado(csv_path: Optional[Path] = None,
+def analise_competitividade_regiao(csv_path: Optional[Path] = None,
                                     out_dir: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Pipeline completo: carrega dados, ordena por estado, plota boxplot e realiza teste de Kruskal-Wallis.
+    Pipeline completo: carrega dados, mapeia regiões, plota boxplot e realiza teste de Kruskal-Wallis para Q10.
     """
     project_root = Path(__file__).resolve().parents[2]
     
-    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "ordered.csv"
+    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "tratado.csv"
     out_dir = Path(out_dir) if out_dir is not None else project_root / "output"
     
     if not csv_path.exists():
@@ -363,33 +370,33 @@ def analise_competitividade_estado(csv_path: Optional[Path] = None,
         return {"error": "Falha ao preparar dados"}
     
     # Plotar boxplot
-    boxplot_path = plot_boxplot_states(df_clean, out_dir)
+    boxplot_path = plot_boxplot_regions(df_clean, out_dir)
     
-    # Estatísticas descritivas (top 10)
-    print(f"\n📊 Estatísticas Descritivas (Top 10 Estados):")
-    for estado in sorted(df_clean["estado"].unique())[:10]:
-        subset = df_clean[df_clean["estado"] == estado]["q7"]
-        sigla = ESTADO_SIGLA.get(estado, "??")
+    # Estatísticas descritivas
+    print(f"\n📊 Estatísticas por Região:")
+    for regiao in sorted(df_clean["Regiao"].unique()):
+        subset = df_clean[df_clean["Regiao"] == regiao]["q10"]
         if len(subset) > 0:
-            print(f"\n  {sigla} ({estado}):")
+            print(f"\n  {regiao}:")
             print(f"    n = {len(subset)}")
             print(f"    média = {subset.mean():.2f}")
             print(f"    mediana = {subset.median():.2f}")
             print(f"    std = {subset.std():.2f}")
+            print(f"    min = {subset.min():.0f}, max = {subset.max():.0f}")
     
     # Teste de Kruskal-Wallis
     print(f"\n\n🔬 TESTE DE KRUSKAL-WALLIS (ANOVA Não-paramétrica)")
     print(f"{'=' * 80}")
-    print(f"Hipótese Nula (H0): As distribuições de Q7 são iguais entre todos os estados")
-    print(f"Hipótese Alternativa (H1): Pelo menos um estado tem distribuição diferente")
+    print(f"Hipótese Nula (H0): As distribuições de Q10 são iguais entre todas as regiões")
+    print(f"Hipótese Alternativa (H1): Pelo menos uma região tem distribuição diferente")
     print(f"{'=' * 80}\n")
     
-    # Preparar grupos por estado
+    # Preparar grupos por região
     grupos = {}
-    for estado in df_clean["estado"].unique():
-        subset = df_clean[df_clean["estado"] == estado]["q7"].values
+    for regiao in df_clean["Regiao"].unique():
+        subset = df_clean[df_clean["Regiao"] == regiao]["q10"].values
         if len(subset) >= 5:  # Filtro: mínimo 5 observações
-            grupos[estado] = subset
+            grupos[regiao] = subset
     
     if len(grupos) < 2:
         print(f"❌ Dados insuficientes para teste (menos de 2 grupos com n≥5)")
@@ -397,7 +404,7 @@ def analise_competitividade_estado(csv_path: Optional[Path] = None,
         # Executar teste de Kruskal-Wallis
         h_stat, p_valor = stats.kruskal(*grupos.values())
         
-        print(f"Número de estados (grupos): {len(grupos)}")
+        print(f"Número de regiões (grupos): {len(grupos)}")
         print(f"Total de observações: {sum(len(v) for v in grupos.values())}\n")
         
         print(f"Estatística H (Kruskal-Wallis): {h_stat:.4f}")
@@ -407,54 +414,79 @@ def analise_competitividade_estado(csv_path: Optional[Path] = None,
         # Interpretação
         if p_valor < 0.001:
             sig_level = "***  (Altamente significativo)"
+            sig_symbol = "***"
         elif p_valor < 0.01:
             sig_level = "**   (Muito significativo)"
+            sig_symbol = "**"
         elif p_valor < 0.05:
             sig_level = "*    (Significativo)"
+            sig_symbol = "*"
         else:
             sig_level = "ns   (Não significativo)"
+            sig_symbol = "ns"
         
         print(f"Resultado: {sig_level}")
         
+        # Criar quadro de significância
+        print(f"\n\n📊 QUADRO DE TESTE ESTATÍSTICO")
+        print(f"{'=' * 80}")
+        test_summary = pd.DataFrame({
+            "Teste Estatístico": ["Kruskal-Wallis"],
+            "Estatística H": [f"{h_stat:.4f}"],
+            "P-valor": [f"{p_valor:.6f}"],
+            "α (significância)": ["0.05"],
+            "Resultado": [sig_symbol],
+            "Interpretação": [sig_level.split("(")[0].strip()]
+        })
+        print(test_summary.to_string(index=False))
+        print(f"{'=' * 80}\n")
+        
+        # Legenda de significância
+        print(f"📌 LEGENDA DE SIGNIFICÂNCIA:")
+        print(f"   ns  = Não significativo (p ≥ 0.05)")
+        print(f"   *   = Significativo (p < 0.05)")
+        print(f"   **  = Muito significativo (p < 0.01)")
+        print(f"   *** = Altamente significativo (p < 0.001)\n")
+        
         if p_valor < 0.05:
             print(f"\n✅ CONCLUSÃO: Rejeita-se H0")
-            print(f"   → Existe diferença significativa na concordância (Q7) entre os estados")
-            print(f"   → Os estados diferem em relação ao grau de concordância sobre")
-            print(f"     manter-se competitivo no mercado")
+            print(f"   → Existe diferença significativa na concordância (Q10) entre as regiões")
+            print(f"   → As regiões diferem em relação ao grau de concordância sobre")
+            print(f"     ter tempo suficiente durante o expediente")
         else:
             print(f"\n❌ CONCLUSÃO: Falha em rejeitar H0")
-            print(f"   → Não há diferença significativa na concordância (Q7) entre os estados")
-            print(f"   → Os estados têm distribuições semelhantes de resposta")
+            print(f"   → Não há diferença significativa na concordância (Q10) entre as regiões")
+            print(f"   → As regiões têm distribuições semelhantes de resposta")
         
         # Salvar resultados em arquivo
-        results_path = out_dir / "kruskal_wallis_Q7.txt"
+        results_path = out_dir / "kruskal_wallis_regiao_Q10.txt"
         with open(results_path, "w", encoding="utf-8") as f:
-            f.write("TESTE DE KRUSKAL-WALLIS - Q7 por Estado\n")
+            f.write("TESTE DE KRUSKAL-WALLIS - Q10 por Região\n")
             f.write("=" * 80 + "\n\n")
-            f.write("Hipótese Nula (H0): As distribuições de Q7 são iguais entre todos os estados\n")
-            f.write("Hipótese Alternativa (H1): Pelo menos um estado tem distribuição diferente\n\n")
+            f.write("Hipótese Nula (H0): As distribuições de Q10 são iguais entre todas as regiões\n")
+            f.write("Hipótese Alternativa (H1): Pelo menos uma região tem distribuição diferente\n\n")
             f.write(f"Estatística H: {h_stat:.4f}\n")
             f.write(f"P-valor: {p_valor:.6f}\n")
             f.write(f"Nível de significância (α): 0.05\n")
-            f.write(f"Número de estados: {len(grupos)}\n")
+            f.write(f"Número de regiões: {len(grupos)}\n")
             f.write(f"Total de observações: {sum(len(v) for v in grupos.values())}\n\n")
-            f.write(f"Resultado: {sig_level}\n\n")
+            f.write(f"Resultado: {sig_symbol}\n")
+            f.write(f"Interpretação: {sig_level}\n\n")
             
             if p_valor < 0.05:
                 f.write("CONCLUSÃO: Rejeita-se H0\n")
-                f.write("→ Existe diferença significativa na concordância (Q7) entre os estados\n")
+                f.write("→ Existe diferença significativa na concordância (Q10) entre as regiões\n")
             else:
                 f.write("CONCLUSÃO: Falha em rejeitar H0\n")
-                f.write("→ Não há diferença significativa na concordância (Q7) entre os estados\n")
+                f.write("→ Não há diferença significativa na concordância (Q10) entre as regiões\n")
             
-            f.write("\n"  "=" * 80 + "\n")
-            f.write("ESTATÍSTICAS DESCRITIVAS POR ESTADO\n")
-            f.write("=" * 80 +  "\n\n")
+            f.write("\n" + "=" * 80 + "\n")
+            f.write("ESTATÍSTICAS DESCRITIVAS POR REGIÃO\n")
+            f.write("=" * 80 + "\n\n")
             
-            for estado in sorted(grupos.keys()):
-                sigla = ESTADO_SIGLA.get(estado, "??")
-                subset = grupos[estado]
-                f.write(f"{sigla} ({estado}):\n")
+            for regiao in sorted(grupos.keys()):
+                subset = grupos[regiao]
+                f.write(f"{regiao}:\n")
                 f.write(f"  n = {len(subset)}\n")
                 f.write(f"  Média = {subset.mean():.2f}\n")
                 f.write(f"  Mediana = {np.median(subset):.2f}\n")
@@ -466,7 +498,7 @@ def analise_competitividade_estado(csv_path: Optional[Path] = None,
     return {
         "status": "ok",
         "n_total": len(df_clean),
-        "n_states": prep_info["n_states"],
+        "n_regions": prep_info["n_regions"],
         "boxplot_path": boxplot_path,
         "df_clean": df_clean,
     }
@@ -476,7 +508,7 @@ if __name__ == "__main__":
     csv_arg = sys.argv[1] if len(sys.argv) > 1 else None
     out_arg = sys.argv[2] if len(sys.argv) > 2 else None
     
-    result = analise_competitividade_estado(csv_path=csv_arg, out_dir=out_arg)
+    result = analise_competitividade_regiao(csv_path=csv_arg, out_dir=out_arg)
     
     if "error" in result:
         print(f"\n❌ Erro: {result['error']}")
@@ -484,5 +516,5 @@ if __name__ == "__main__":
     else:
         print(f"\n✅ Análise concluída com sucesso!")
         print(f"   Total de respondentes: {result['n_total']}")
-        print(f"   Estados: {result['n_states']}")
+        print(f"   Regiões: {result['n_regions']}")
         print(f"   Boxplot: {result['boxplot_path']}")

@@ -18,33 +18,13 @@ except Exception:
 BASE_ORANGE = "#ff6002"
 
 # Mapeamentos de experiência para valores numéricos (ponto médio em anos)
-EXPERIENCE_MAP = {
-    "Até um ano.": 0.5,
-    "Entre 1 e 2 anos.": 1.5,
-    "Entre 3 e 4 anos.": 3.5,
-    "Entre 5 e 6 anos.": 5.5,
-    "Entre 7 e 8 anos.": 7.5,
-    "Mais de 8 anos.": 10.0,
-}
-
-# Ordem dos níveis profissionais
-NIVEL_ORDER = [
-    "Estudante/ Estagiário / Trainee",
-    "Júnior",
-    "Pleno",
-    "Sênior",
-    "Especialista / Principal (Foco em contribuição técnica individual)",
-    "Líder / Coordenador / Gerente (Foco em gestão de pessoas)",
-]
-
-# Mapa de labels simplificados para exibição
-NIVEL_LABELS_MAP = {
-    "Estudante/ Estagiário / Trainee": "Estagiário",
-    "Júnior": "Júnior",
-    "Pleno": "Pleno",
-    "Sênior": "Sênior",
-    "Especialista / Principal (Foco em contribuição técnica individual)": "Especialista (técnico)",
-    "Líder / Coordenador / Gerente (Foco em gestão de pessoas)": "Líder (pessoas)",
+EXPERIENCE_MAP_NORM = {
+    "até um ano": 0.5,
+    "entre 1 e 2 anos": 1.5,
+    "entre 3 e 4 anos": 3.5,
+    "entre 5 e 6 anos": 5.5,
+    "entre 7 e 8 anos": 7.5,
+    "mais de 8 anos": 10.0,
 }
 
 
@@ -63,13 +43,6 @@ def _orange_shades(base_hex: str, n: int) -> List[tuple]:
         rgb = white * (1.0 - mix) + base_rgb * mix
         shades.append(tuple(rgb.tolist()))
     return shades
-
-
-def _normalize_text(s: str) -> str:
-    """Normalizar texto removendo espaços extras e convertendo para lowercase."""
-    if s is None:
-        return ""
-    return str(s).strip().lower()
 
 
 def analyze_nivel_vs_experiencia(
@@ -124,26 +97,25 @@ def analyze_nivel_vs_experiencia(
     df_clean = df_clean.dropna()
     print(f"[DEBUG] Linhas após dropna: {len(df_clean)}")
     
+    # Normalizar experiência
+    df_clean["exp_norm"] = (
+        df_clean[exp_col]
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .str.rstrip(".")
+    )
+    
     # Mapear experiência para valores numéricos
-    df_clean["exp_years"] = df_clean[exp_col].map(EXPERIENCE_MAP)
+    df_clean["exp_years"] = df_clean["exp_norm"].map(EXPERIENCE_MAP_NORM)
     print(f"\n[DEBUG] Valores únicos em {exp_col}:")
     print(df_clean[exp_col].value_counts())
     
     df_clean = df_clean.dropna(subset=["exp_years"])
     print(f"[DEBUG] Linhas após mapear experiência: {len(df_clean)}")
     
-    # Garantir que nível está na ordem desejada
-    df_clean[nivel_col] = pd.Categorical(
-        df_clean[nivel_col],
-        categories=NIVEL_ORDER,
-        ordered=True
-    )
-    
-    # Mapear labels simplificados para exibição
-    df_clean["nivel_display"] = df_clean[nivel_col].map(NIVEL_LABELS_MAP)
-    
-    # Remover linhas com nivel_display = NaN
-    df_clean = df_clean.dropna(subset=["nivel_display"])
+    # Normalizar nível (remover espaços extras)
+    df_clean["nivel"] = df_clean[nivel_col].astype(str).str.strip()
      
     print(f"\n[DEBUG] Valores únicos em {nivel_col}:")
     print(df_clean[nivel_col].value_counts())
@@ -156,35 +128,48 @@ def analyze_nivel_vs_experiencia(
         try:
             fig, ax = plt.subplots(figsize=(16, 8))
             
+            # ⭐ Filtrar apenas níveis com n >= 5
+            niveis_com_dados = sorted([
+                nivel for nivel in df_clean["nivel"].unique()
+                if (df_clean["nivel"] == nivel).sum() >= 5
+            ])
+            
+            if len(niveis_com_dados) < 2:
+                print(f"❌ Apenas {len(niveis_com_dados)} nível(is) com n >= 5. Análise impossível.")
+                return {"error": "Dados insuficientes", "boxplot_path": None}
+            
+            # Filtrar dataframe
+            df_plot = df_clean[df_clean["nivel"].isin(niveis_com_dados)].copy()
+            
             # Remover outliers antes de calcular a média
-            Q1 = df_clean.groupby("nivel_display", observed=True)["exp_years"].quantile(0.25)
-            Q3 = df_clean.groupby("nivel_display", observed=True)["exp_years"].quantile(0.75)
+            Q1 = df_plot.groupby("nivel", observed=True)["exp_years"].quantile(0.25)
+            Q3 = df_plot.groupby("nivel", observed=True)["exp_years"].quantile(0.75)
             IQR = Q3 - Q1
             
             # Filtrar dados sem outliers
-            df_no_outliers = df_clean.copy()
-            for nivel in df_no_outliers["nivel_display"].unique():
+            df_no_outliers = df_plot.copy()
+            for nivel in niveis_com_dados:
                 if pd.isna(nivel):
                     continue
-                mask = (df_no_outliers["nivel_display"] == nivel)
+                mask = (df_no_outliers["nivel"] == nivel)
                 lower = Q1[nivel] - 1.5 * IQR[nivel]
                 upper = Q3[nivel] + 1.5 * IQR[nivel]
                 df_no_outliers.loc[mask, "exp_years"] = df_no_outliers.loc[mask, "exp_years"].clip(lower, upper)
              
-            # Gerar paleta de cores laranja
-            n_niveis = len(NIVEL_LABELS_MAP)
-            orange_palette = _orange_shades(BASE_ORANGE, n_niveis)
-            
             # Mapear cores para que a maior média fique na cor base (#ff6002)
-            means_for_color = df_no_outliers.groupby("nivel_display", observed=True)["exp_years"].mean()
-            sorted_niveis = means_for_color.sort_values(ascending=True).index.tolist()
+            means_for_color = df_no_outliers.groupby("nivel", observed=True)["exp_years"].mean()
+            sorted_niveis = means_for_color.sort_values().index.tolist()
+            
+            # Gerar paleta de cores laranja
+            orange_palette = _orange_shades(BASE_ORANGE, len(sorted_niveis))
             color_map = {nivel: orange_palette[i] for i, nivel in enumerate(sorted_niveis)}
             
             # Boxplot com paleta laranja
             sns.boxplot(
-                data=df_clean,
-                x="nivel_display",
+                data=df_plot,
+                x="nivel",
                 y="exp_years",
+                order=sorted_niveis,
                 ax=ax,
                 palette=color_map,
                 width=0.7,
@@ -193,25 +178,48 @@ def analyze_nivel_vs_experiencia(
             )
             
             # Calcular média SEM outliers
-            means = df_no_outliers.groupby("nivel_display", observed=True)["exp_years"].mean()
+            means = df_no_outliers.groupby("nivel", observed=True)["exp_years"].mean()
             positions = range(len(means))
             
-            # Valores da média acima da linha
-            for pos, mean_val in zip(positions, means.values):
-                if pos == 0:
-                    ax.hlines(mean_val, pos - 0.35, pos + 0.35, color="black", linestyles="--", 
-                             linewidth=1.5, zorder=4, label="Média (sem outliers)")
-                else:
-                    ax.hlines(mean_val, pos - 0.35, pos + 0.35, color="black", linestyles="--", 
-                             linewidth=1.5, zorder=4)
-                 
-                # Valor numérico acima
-                ax.text(pos, mean_val + 0.3, f"{mean_val:.1f}", ha="center", va="center",
-                        fontsize=20, fontweight="bold", color="black")
+            # Plotar médias como círculo preto com borda branca (PADRÃO DO PROJETO)
+            means_ordered = [means[nivel] for nivel in sorted_niveis]
+            
+            ax.scatter(
+                positions,
+                means_ordered,
+                color="black",          # preenchimento preto
+                s=150,
+                zorder=5,
+                marker="o",
+                edgecolor="white",      # borda branca
+                linewidth=2.5,          # espessura da borda
+                label="Média"
+            )
+            
+            # Valores numéricos das médias
+            for pos, nivel in enumerate(sorted_niveis):
+                mean_val = means[nivel]
+                ax.text(
+                    pos,
+                    mean_val + 0.3,
+                    f"{mean_val:.1f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=18,
+                    fontweight="bold",
+                    color="black"
+                )
+            
+            # Criar rótulos com n
+            group_labels = [
+                f"{nivel.replace(' (', '\n(')}\n"
+                f"(n={(df_plot['nivel'] == nivel).sum()})"
+                for nivel in sorted_niveis
+            ]
             
             ax.set_xlabel("Nível Profissional", fontsize=20, fontweight="bold")
             ax.set_ylabel("Tempo de Experiência (anos)", fontsize=20, fontweight="bold")
-            ax.set_xticklabels(ax.get_xticklabels(), ha="center", fontsize=20, rotation=15)
+            ax.set_xticklabels(group_labels, ha="center", fontsize=16)
             ax.tick_params(axis="y", labelsize=20)
             ax.grid(axis="y", alpha=0.35, linestyle="--")
             ax.legend(loc="upper left", fontsize=20)
@@ -238,7 +246,7 @@ if __name__ == "__main__":
     import os
     
     project_root = Path(__file__).resolve().parents[1]
-    csv_path = sys.argv[1] if len(sys.argv) > 1 else os.getenv("DATA_PATH", str(project_root / "data" / "raw.csv"))
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else os.getenv("DATA_PATH", str(project_root / "data" / "tratado.csv"))
     
     p = Path(csv_path)
     if not p.exists():

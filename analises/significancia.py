@@ -118,6 +118,7 @@ def calculate_pvalues(df: pd.DataFrame, likert_cols: List[str],
     - Idade: Spearman correlation
     - Outros categóricos: Kruskal-Wallis
     - Ignora grupos com n < 5
+    - Remove "Prefiro não responder" de Experiência
     """
     n_questions = len(likert_cols)
     n_socio = len(socio_cols_found)
@@ -135,38 +136,41 @@ def calculate_pvalues(df: pd.DataFrame, likert_cols: List[str],
         socio_label = SOCIODEMOGRAPHIC_COLS[socio_col]
         
         for i, likert_col in enumerate(likert_cols):
-            # Criar subset com dados válidos
             subset = df[[socio_col, likert_col]].copy()
             subset[likert_col] = pd.to_numeric(subset[likert_col], errors="coerce")
             subset = subset.dropna()
+            
+            # ⭐ REMOVER "Prefiro não responder" de Experiência
+            if socio_label == "Experiência":
+                subset = subset[subset[socio_col] != "Prefiro não responder"].copy()
             
             if len(subset) < 5:
                 continue
             
             pval = None
             
-            # Regra 1: Idade → Spearman correlation
+            # Regra 1: Idade → Spearman
             if socio_label == "Idade":
                 try:
                     subset["age_numeric"] = subset[socio_col].apply(convert_age_to_numeric)
                     subset = subset.dropna(subset=["age_numeric"])
-                    
                     if len(subset) >= 5:
                         stat, pval = stats.spearmanr(subset["age_numeric"], subset[likert_col])
-                except Exception as e:
+                except Exception:
                     pass
             
-            # Regra 2: Outros categóricos → Kruskal-Wallis
+            # Regra 2: Categóricos → Kruskal-Wallis
             else:
                 try:
-                    groups = subset.groupby(socio_col)[likert_col].apply(list).to_dict()
-                    
-                    # Filtrar grupos com n >= 5
-                    groups = {k: v for k, v in groups.items() if len(v) >= 5}
+                    groups = {}
+                    for cat in subset[socio_col].unique():
+                        vals = subset[subset[socio_col] == cat][likert_col].values
+                        if len(vals) >= 5:  # ← Filtrar grupos pequenos
+                            groups[cat] = vals
                     
                     if len(groups) >= 2:
                         stat, pval = stats.kruskal(*groups.values())
-                except Exception as e:
+                except Exception:
                     pass
             
             if pval is not None:
@@ -302,7 +306,7 @@ def analyze_significancia(csv_path: Optional[Path] = None,
     """
     project_root = Path(__file__).resolve().parents[1]
     
-    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "ordered.csv"
+    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "tratado.csv"
     out_dir = Path(out_dir) if out_dir is not None else project_root / "output"
     
     if not csv_path.exists():

@@ -178,14 +178,14 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
     )
     
     # Títulos e labels
-    ax.set_title(
-        "Correlação: Idade vs. Q6 (Carga horária prejudicou tempo pessoal)",
-        fontsize=18,
-        fontweight="bold",
-        pad=20,
-    )
+    # ax.set_title(
+    #     "Correlação: Idade vs. Q6 (Impacto no tempo pessoal)",
+    #     fontsize=18,
+    #     fontweight="bold",
+    #     pad=20,
+    # )
     ax.set_xlabel("Idade (anos)", fontsize=20, fontweight="bold")
-    ax.set_ylabel("Q6 (Concordância 1-5)", fontsize=20, fontweight="bold")
+    ax.set_ylabel("Q6 (Impacto no tempo pessoal)", fontsize=20, fontweight="bold")
     
     # Aumentar tamanho dos ticks
     ax.tick_params(axis='both', labelsize=18)
@@ -216,9 +216,9 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
     quadro_text = (
         f"Correlação de Spearman\n"
         f"{'─' * 32}\n"
+        f"n = {n}\n"
         f"r = {r:.4f}\n"
         f"p = {pval:.6f}\n"
-        f"n = {n}\n"
         f"Resultado: {sig_symbol} {sig_text}"
     )
     
@@ -238,7 +238,8 @@ def plot_scatter_regression(df_clean: pd.DataFrame, stats_dict: Dict,
     plt.tight_layout()
     
     # Salvar figura
-    out_path = out_dir / "scatter_idade_q6_orange.png"
+    script_name = Path(__file__).stem
+    out_path = out_dir / f"{script_name}.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     
@@ -253,7 +254,7 @@ def analyze_idade_vs_tempo(csv_path: Optional[Path] = None,
     """
     project_root = Path(__file__).resolve().parents[2]  # CORRIGIDO: .parents[1] → .parents[2]
     
-    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "ordered.csv"
+    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "tratado.csv"
     out_dir = Path(out_dir) if out_dir is not None else project_root / "output"
     
     if not csv_path.exists():

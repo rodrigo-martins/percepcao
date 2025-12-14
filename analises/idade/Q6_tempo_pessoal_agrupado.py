@@ -233,7 +233,7 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
     
     # Adicionar valores das médias como texto
     # Q1 (escuro) = branco, Q2+Q3 (médio) = branco, Q4 (claro) = preto
-    text_colors = {"Q1": "white", "Q2+Q3": "white", "Q4": "black"}
+    text_colors = {"Q1": "black", "Q2+Q3": "black", "Q4": "black"}
     
     for pos, (group, mean_val) in enumerate(means.items()):
         text_color = text_colors.get(group, "black")
@@ -263,7 +263,7 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
     # Configurar títulos e labels
     ax.set_xlabel("Grupos de Idade", fontsize=20, fontweight="bold")
     ax.set_xticklabels(group_labels, fontsize=14)
-    ax.set_ylabel("Q6 (Carga horária prejudicou tempo pessoal)", fontsize=20, fontweight="bold")
+    ax.set_ylabel("Q6 (Impacto no tempo pessoal)", fontsize=20, fontweight="bold")
     # ax.set_title(
     #     "Distribuição por Grupos de Idade: Q6 (Carga horária)",
     #     fontsize=18,
@@ -310,6 +310,7 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
         quadro_text = (
             f"Teste de Kruskal-Wallis\n"
             f"{'─' * 32}\n"
+            f"n = {sum(len(g) for g in grupos.values())}\n"
             f"H = {h_stat:.4f}\n"
             f"p = {p_valor:.6f}\n"
             f"Resultado: {sig_symbol} {sig_text}"
@@ -330,7 +331,8 @@ def plot_boxplot_quartis(df_clean: pd.DataFrame, out_dir: Path) -> Optional[Path
     plt.tight_layout()
     
     # Salvar figura
-    out_path = out_dir / "boxplot_idade_quartis_orange.png"
+    script_name = Path(__file__).stem
+    out_path = out_dir / f"{script_name}.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     
@@ -345,7 +347,7 @@ def analise_idade_vs_tempo_grupo(csv_path: Optional[Path] = None,
     """
     project_root = Path(__file__).resolve().parents[2]
      
-    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "ordered.csv"
+    csv_path = Path(csv_path) if csv_path is not None else project_root / "data" / "tratado.csv"
     out_dir = Path(out_dir) if out_dir is not None else project_root / "output"
     
     if not csv_path.exists():
