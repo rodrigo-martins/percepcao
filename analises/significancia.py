@@ -217,7 +217,7 @@ def plot_heatmap(pvalue_matrix: pd.DataFrame, out_dir: Path) -> Optional[Path]:
     ax.xaxis.set_label_position("top")
     
     ax.set_xlabel("Variáveis Sociodemográficas", fontsize=14, fontweight="bold")
-    ax.set_ylabel("Questões Likert", fontsize=14, fontweight="bold")
+    ax.set_ylabel("Variáveis Efetividade e Qualidade", fontsize=14, fontweight="bold")
     ax.tick_params(axis='x', labelsize=12)
     ax.tick_params(axis='y', labelsize=12)
     
@@ -263,7 +263,7 @@ def plot_heatmap(pvalue_matrix: pd.DataFrame, out_dir: Path) -> Optional[Path]:
             pass
      
     plt.tight_layout()
-    out_path = out_dir / "heatmap_significancia_bold.png"
+    out_path = out_dir / "significancia_heatmap.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     

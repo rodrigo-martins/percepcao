@@ -1,55 +1,28 @@
 Tentei manter os termos concisos, mas preservando o sentido central da pergunta.
-
 Q1 (Conexão com objetivos): Entendi como a experiência de aprendizado se conectou com os objetivos da empresa.
-
 Q2 (Apoio e recursos): Tive o apoio e os recursos necessários (tempo, tecnologia, suporte) da empresa para realizar esta experiência.
-
 Q3 (Relevância para a função): O conteúdo da experiência de aprendizado atendeu às necessidades da minha função.
-
 Q4 (Adaptação ao nível): O conteúdo da experiência de aprendizado foi adaptado ao meu nível de experiência.
-
-Q5 (Co-criação/Opinião): Minha opinião foi considerada na criação da experiência de aprendizado que participei.
-
-Q6 (Impacto no tempo pessoal): A carga horária desta experiência prejudicou meu tempo pessoal (descanso, vida social).
-
+Q5 (Consideração da opinião): Minha opinião foi considerada na criação da experiência de aprendizado que participei.
+Q6 (Prejuízo ao tempo pessoal): A carga horária desta experiência prejudicou meu tempo pessoal (descanso, vida social).
 Q7 (Competitividade no mercado): A experiência foi importante para me manter competitivo(a) no mercado.
-
 Q8 (Motivação para aprender): O que aprendi me motivou a buscar novos conhecimentos.
-
 Q9 (Incentivo da liderança): A liderança da minha área incentivou ativamente minha participação.
-
 Q10 (Tempo no expediente): Tive tempo suficiente durante o expediente para participar e estudar.
-
-Q11 (Obrigação vs. Interesse): Participei desta experiência mais por obrigação do que por interesse.
-
+Q11 (Obrigação vs. Opcional): Participei desta experiência mais por obrigação do que por interesse.
 Q12 (Incentivos tangíveis): A empresa ofereceu incentivos claros para a participação (bônus, folgas, etc.).
-
 Q13 (Reconhecimento): A empresa costuma reconhecer os funcionários que concluem treinamentos.
-
 Q14 (Organização e estrutura): A experiência de aprendizado foi bem organizada e estruturada.
-
 Q15 (Materiais úteis): Os materiais que recebi para a experiência de aprendizado foram úteis.
-
 Q16 (Ambiente adequado): O ambiente (físico ou virtual) foi adequado para o aprendizado.
-
 Q17 (Clareza do instrutor): A explicação do instrutor foi clara e fácil de entender.
-
 Q18 (Atuação do instrutor): A atuação do instrutor foi fundamental para o meu aprendizado e motivação.
-
 Q19 (Atividades variadas): As atividades durante a experiência foram interessantes e variadas.
-
 Q20 (Foco em Soft Skills): A experiência continha uma parte relevante dedicada a soft skills.
-
 Q21 (Satisfação geral): Fiquei satisfeito(a) com a qualidade da experiência de aprendizado.
-
-Q22 (Raciocínio para problemas): A experiência ajudou a desenvolver meu raciocínio para resolver problemas.
-
+Q22 (Raciocínio para resolução de problemas): A experiência ajudou a desenvolver meu raciocínio para resolver problemas.
 Q23 (Melhora de desempenho): Aplicar o que aprendi melhorou meu desempenho.
-
 Q24 (Aplicabilidade prática): Consigo aplicar no meu trabalho o que aprendi.
-
 Q25 (Aumento de autonomia): O que aprendi me deu mais autonomia no trabalho.
-
 Q26 (Suporte à aplicação): O suporte da minha liderança foi um incentivo para eu aplicar o que aprendi.
-
 Q27 (Oportunidades de crescimento): A experiência abriu oportunidades de crescimento na empresa (promoção/aumento).

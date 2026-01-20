@@ -23,7 +23,7 @@ BASE_ORANGE = "#ff6002"
 
 def add_manual_division_lines(extra_divisions, ax, spans, full_xmin, full_xmax, x_label_pos,
                                y_positions=None, line_style='-', color='gray', linewidth=1.2,
-                               label_pad=0.02, rotate=270, fontsize=9, counts=None, response_order=None):
+                               label_pad=0.02, rotate=270, fontsize=12, counts=None, response_order=None):
     """
     Desenha linhas contínuas (solid) no eixo y para cada divisão definida em extra_divisions
     e posiciona um label à direita do rótulo da subcategoria.
@@ -336,8 +336,8 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
         }
 
         # plot stacked horizontal divergent bars
-        fig, ax = plt.subplots(figsize=(12, max(4, 0.5 * len(counts))))
-        height = 0.6
+        fig, ax = plt.subplots(figsize=(12, max(4, 0.9 * len(counts))))
+        height = 0.55
 
         # negativo: Discordo totalmente, Discordo, Neutro (neutro fica à esquerda por escolha)
         neg_cols = [c for c in ["Neutro", "Discordo","Discordo totalmente"] if c in percent.columns]
@@ -350,7 +350,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
                 cnt = counts.iloc[i].get(col, 0)
                 if cnt:
                     x_pos = lefts_neg[i] + v / 2
-                    ax.text(x_pos, i, f"{int(abs(cnt))}", ha="center", va="center", fontsize=8, color="black")
+                    ax.text(x_pos, i, f"{int(abs(cnt))}", ha="center", va="center", fontsize=12, color="black")
             lefts_neg += vals
 
         # positivo: Concordo, Concordo totalmente
@@ -363,7 +363,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
                 cnt = counts.iloc[i].get(col, 0)
                 if cnt:
                     x_pos = lefts_pos[i] + v / 2
-                    ax.text(x_pos, i, f"{int(abs(cnt))}", ha="center", va="center", fontsize=8, color="black")
+                    ax.text(x_pos, i, f"{int(abs(cnt))}", ha="center", va="center", fontsize=12, color="black")
             lefts_pos += vals
 
         # --- novo: dividir perguntas em subcategorias (apenas subcategorias) e desenhar linhas/labels ---
@@ -498,6 +498,8 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
         x_text_base = xmax + (xmax - xmin) * 0.12
         right_margin = x_text_base + (xmax - xmin) * 0.06
         ax.set_xlim(-100, right_margin)
+        ax.set_ylim(-0.5, len(percent) - 0.5)
+
 
         # desenhar linhas pretas sólidas nas fronteiras cobrindo todo o espaço horizontal (-100..right_margin)
         full_xmin, full_xmax = ax.get_xlim()
@@ -553,7 +555,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
             extra_divisions, ax, spans, full_xmin, full_xmax,
             x_label_pos=x_text_base + (xmax - xmin) * 0.06 + 3,
             y_positions=y_positions, line_style='-', color='black', linewidth=1.2,
-            label_pad=0.01, rotate=270, fontsize=9,
+            label_pad=0.01, rotate=270, fontsize=12,
             counts=counts, response_order=order
          )
 
@@ -603,26 +605,26 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
             else:
                 std_val = 0.0
             if mean_val is not None:
-                label_display = f"{sub} ({mean_val:.2f}\u00A0[{std_val:.2f}])"
+                label_display = f"{sub} ({mean_val:.2f})"
          
             wrapped_label = "\n".join(wrap(label_display, width=20))
             ax.text(x_text_base+8, y_center, wrapped_label, ha="right", va="center", rotation=0,
-                    fontsize=9, color="black", zorder=5)
+                    fontsize=12, color="black", zorder=5)
  
         # --- fim divisão por subcategorias ---
         # --- fim divisão por categorias ---
 
-        # adicionar nota no rodapé explicando as médias e desvios padrão entre parênteses
-        try:
-            fig = ax.get_figure()
-            fig.text(
-                0.02, 0.01,
-                "Nota: números entre parênteses são as médias (escala 1–5); valores entre colchetes são desvios padrão.",
-                fontsize=8, ha="left", va="bottom", color="black"
-            )
-        except Exception:
-            # não crítico — seguir sem a anotação se falhar
-            pass
+        # # adicionar nota no rodapé explicando as médias e desvios padrão entre parênteses
+        # try:
+        #     fig = ax.get_figure()
+        #     fig.text(
+        #         0.02, 0.02,
+        #         "Nota: números entre parênteses são as médias (escala 1–5);",
+        #         fontsize=12,color="black"
+        #     )
+        # except Exception:
+        #     # não crítico — seguir sem a anotação se falhar
+        #     pass
 
         # --- Anotar média e desvio padrão de cada pergunta no lado esquerdo do gráfico ---
         try:
@@ -630,7 +632,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
             y_positions_for_bars = _np.arange(len(percent))
             xmin, xmax = ax.get_xlim()
             # posicionar médias à esquerda do limite das barras (um pouco para fora)
-            x_mean_left = xmin - (xmax - xmin) * 0.05 + 26
+            x_mean_left = xmin - (xmax - xmin) * 0.05 + 22
 
             # mapear respostas para valores 1..5 usando 'order'
             resp_map = {}
@@ -675,14 +677,14 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
                         std_val = _np.std(values_list, ddof=1)  # ddof=1 para amostra
                     else:
                         std_val = 0.0
-                    txt = f"({mean_val:.2f} [{std_val:.2f}])"
+                    txt = f"({mean_val:.2f})"
                 else:
                     txt = "-"
 
                 y = float(y_positions_for_bars[i])
                 # alinhar texto à direita para ficar colado ao limite esquerdo
                 ax.text(x_mean_left, y, txt, ha="center", va="center",
-                        fontsize=8, color="black", zorder=10, clip_on=False)
+                        fontsize=12, color="black", zorder=10, clip_on=False)
         except Exception as _e:
             print("warning: não foi possível anotar médias nas barras:", _e)
 
@@ -703,24 +705,26 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None) -> Dict[str
             # prefixo em negrito usando mathtext (\bf{})
             prefix = f"$\\bf{{Q{i+1}}}$"
             prefixed_labels.append(f"{prefix} - {wrapped}")
-        ax.set_yticklabels(prefixed_labels, fontsize=9)
+        ax.set_yticklabels(prefixed_labels, fontsize=14)
         ax.yaxis.tick_left()
         ax.tick_params(axis="y", which="both", left=True, labelleft=True, right=False, labelright=False)
         ax.invert_yaxis()
 
-        ax.set_xlabel("Porcentagem", fontsize=12)
-        ax.set_title("Distribuição das respostas — Escala Likert", fontsize=13, weight="bold", pad=18)
+        ax.set_xlabel("Porcentagem", fontsize=16, weight="bold", labelpad=2)
+        ax.xaxis.set_label_coords(0.5, -0.02)
+        # ax.set_title("Distribuição das respostas — Escala Likert", fontsize=13, weight="bold", pad=18)
 
         # legenda centralizada acima
         from matplotlib.patches import Patch
         desired = ["Discordo totalmente", "Discordo", "Neutro", "Concordo", "Concordo totalmente"]
         legend_labels = [lab for lab in desired if lab in percent.columns]
         handles = [Patch(facecolor=color_map[lab], edgecolor="white", label=lab) for lab in legend_labels]
-        ax.legend(handles, legend_labels, title="", bbox_to_anchor=(0.5, 1.02), loc='upper center', ncol=len(legend_labels), frameon=False)
+        ax.legend(handles, legend_labels, title="", bbox_to_anchor=(0, 1.04), fontsize=14, loc='upper center', ncol=len(legend_labels), frameon=False)
 
         plt.tight_layout()
+        fig.subplots_adjust(bottom=0.10, left=0.40)
         out_file = out_dir / "likert.png"
-        fig.savefig(out_file, dpi=150, bbox_inches="tight")
+        fig.savefig(out_file, dpi=300, bbox_inches="tight", pad_inches=0.1)
         plt.close(fig)
         image_path = out_file
     except Exception:
