@@ -20,6 +20,80 @@ except Exception:
 BASE_ORANGE = "#ff6002"
 
 
+def draw_division_borders(extra_divisions, ax, y_positions, border_width_px=4, colors=None):
+    """
+    Desenha bordas verticais de 4px ao lado direito do gráfico para cada divisão.
+    
+    Parâmetros:
+    - extra_divisions: lista de tuplas ("Label", start_idx, end_idx) ou ("Label", [idxs])
+    - ax: eixo matplotlib
+    - y_positions: array com posições y
+    - border_width_px: largura da borda em pixels (padrão 4px)
+    - colors: dicionário opcional {nome_divisao: cor}
+    """
+    from matplotlib.patches import Rectangle
+    import numpy as _np
+    
+    # Cores padrão para cada divisão (cores bem distintas)
+    default_colors = [
+        "#FBE5D6",  # laranja muito claro
+        "#F8CBAD",  # laranja claro
+        "#F4B183",  # laranja médio-claro
+        "#ED7D31",  # laranja médio
+        "#C55A11",  # laranja escuro
+    ]
+    
+    if colors is None:
+        colors = default_colors
+    
+    # Obter limites do eixo
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    
+    # Usar unidades de dados diretamente (mais simples e confiável)
+    # 2% da largura do eixo para boa visibilidade
+    ax_width_data = xmax - xmin
+    border_width_data = ax_width_data * 0.02  # 2% do eixo X
+    
+    # A borda deve ficar bem na borda direita do eixo (xmax)
+    # Não subtrair nada para ficar juntinho mesmo
+    border_x_position = xmax
+    
+    # Desenhar borda para cada divisão (LADO DIREITO - xmax)
+    for idx_div, item in enumerate(extra_divisions):
+        if len(item) == 3 and isinstance(item[1], int) and isinstance(item[2], int):
+            label, start_i, end_i = item
+            idxs = list(range(max(0, start_i), min(len(y_positions), end_i) + 1))
+        elif len(item) == 2 and isinstance(item[1], (list, tuple)):
+            label, idxs = item
+            idxs = [k for k in idxs if 0 <= k < len(y_positions)]
+        else:
+            continue
+        
+        if not idxs:
+            continue
+        
+        idxs_sorted = sorted(idxs)
+        y_top = float(y_positions[idxs_sorted[0]]) - 0.5
+        y_bottom = float(y_positions[idxs_sorted[-1]]) + 0.5
+        
+        # Obter cor
+        color = colors[idx_div]
+        
+        # Desenhar retângulo fino (borda) à DIREITA
+        # Posicionar bem juntinho à borda direita do eixo, com pequeno offset
+        rect = Rectangle(
+            (border_x_position - border_width_data * 0.6 - 5, y_top),  # Pequeno offset para ficar perto
+            border_width_data,
+            y_bottom - y_top,
+            facecolor=color,
+            edgecolor="none",
+            zorder=5,  # Aumentar zorder para ficar bem visível
+            alpha=0.9,
+            clip_on=False  # IMPORTANTE: desabilitar clipping para ver fora da área
+        )
+        ax.add_patch(rect)
+
 
 def add_manual_division_lines(extra_divisions, ax, spans, full_xmin, full_xmax, x_label_pos,
                                y_positions=None, line_style='-', color='gray', linewidth=1.2,
@@ -86,9 +160,26 @@ def add_manual_division_lines(extra_divisions, ax, spans, full_xmin, full_xmax, 
         label_display = str(label)
         if counts is not None and response_order is not None:
             mean_val = _calculate_likert_mean(idxs_sorted, counts, response_order)
+            # calcular desvio padrão
+            values_list = []
+            for idx in idxs_sorted:
+                if idx < len(counts):
+                    row = counts.iloc[idx]
+                    resp_map = {response_order[i]: i+1 for i in range(min(5, len(response_order)))}
+                    for resp_label, val_num in resp_map.items():
+                        try:
+                            c = float(row.get(resp_label, 0) or 0)
+                            for _ in range(int(c)):
+                                values_list.append(val_num)
+                        except Exception:
+                            pass
+            if len(values_list) > 1:
+                std_val = _np.std(values_list, ddof=1)
+            else:
+                std_val = 0.0
             if mean_val is not None:
-                label_display = f"{label} ({mean_val:.2f})"
-            print(f"[extra_divisions] {label} (índices {idxs_sorted}): média = {mean_val:.2f}")
+                label_display = f"{label} ({mean_val:.2f}±{std_val:.2f})"
+            print(f"[extra_divisions] {label} (índices {idxs_sorted}): média = {mean_val:.2f} ± {std_val:.2f}")
         
         # quebrar rótulo em múltiplas linhas para melhor encaixe quando rotacionado
         import textwrap
@@ -614,6 +705,9 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None, language: s
             counts=counts, response_order=order
          )
 
+        # DESENHAR BORDAS DE 4PX PARA CADA DIVISÃO
+        draw_division_borders(extra_divisions, ax, y_positions, border_width_px=4)
+
         # DEBUG: imprimir ordem das subcategorias, posições e perguntas correspondentes
         print("Subcategorias (ordem de aparição) e posições:")
         # questions_wrapped contém os rótulos exibidos na mesma ordem do eixo y
@@ -660,7 +754,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None, language: s
             else:
                 std_val = 0.0
             if mean_val is not None:
-                label_display = f"{sub} ({mean_val:.2f})"
+                label_display = f"{sub} ({mean_val:.2f}±{std_val:.2f})"
          
             wrapped_label = "\n".join(wrap(label_display, width=15))
             ax.text(x_text_base - 10, y_center, wrapped_label, ha="left", va="center", rotation=0,
@@ -669,17 +763,33 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None, language: s
         # --- fim divisão por subcategorias ---
         # --- fim divisão por categorias ---
 
-        # # adicionar nota no rodapé explicando as médias e desvios padrão entre parênteses
-        # try:
-        #     fig = ax.get_figure()
-        #     fig.text(
-        #         0.02, 0.02,
-        #         "Nota: números entre parênteses são as médias (escala 1–5);",
-        #         fontsize=12,color="black"
-        #     )
-        # except Exception:
-        #     # não crítico — seguir sem a anotação se falhar
-        #     pass
+        # adicionar notas no rodapé explicando as médias e desvios padrão, e o significado das linhas
+        try:
+            fig = ax.get_figure()
+            
+            # Primeira nota: Média ± Desvio Padrão
+            if language == "pt":
+                note1 = "Nota 1: Números entre parênteses indicam Média ± Desvio Padrão (escala 1–5)."
+                note2 = "Nota 2: Linhas tracejadas separam subcategorias; linhas contínuas separam categorias principais."
+            else:
+                note1 = "Note 1: Numbers in parentheses indicate Mean ± Standard Deviation (scale 1–5)."
+                note2 = "Note 2: Dashed lines separate subcategories; solid lines separate main categories."
+            
+            fig.text(
+                0.02, 0.02,
+                note1,
+                fontsize=11, color="black"
+            )
+            
+            # Segunda nota: significado das linhas
+            fig.text(
+                0.02, 0.005,
+                note2,
+                fontsize=11, color="black"
+            )
+        except Exception:
+            # não crítico — seguir sem a anotação se falhar
+            pass
 
         # --- Anotar média e desvio padrão de cada pergunta no lado esquerdo do gráfico ---
         try:
@@ -687,7 +797,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None, language: s
             y_positions_for_bars = _np.arange(len(percent))
             xmin, xmax = ax.get_xlim()
             # posicionar médias à esquerda do limite das barras (um pouco para fora)
-            x_mean_left = xmin - (xmax - xmin) * 0.05 + 22
+            x_mean_left = xmin - (xmax - xmin) * 0.05 + 27
 
             # mapear respostas para valores 1..5 usando 'order'
             resp_map = {}
@@ -732,7 +842,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None, language: s
                         std_val = _np.std(values_list, ddof=1)  # ddof=1 para amostra
                     else:
                         std_val = 0.0
-                    txt = f"({mean_val:.2f})"
+                    txt = f"({mean_val:.2f}±{std_val:.2f})"
                 else:
                     txt = "-"
 
@@ -846,7 +956,7 @@ def analyze_likert(df: pd.DataFrame, out_dir: Optional[Path] = None, language: s
         plt.tight_layout()
         fig.subplots_adjust(bottom=0.10, left=0.25, right=0.95)
         out_file = out_dir / "likert.png"
-        fig.savefig(out_file, dpi=300, bbox_inches="tight", pad_inches=0.1)
+        fig.savefig(out_file, dpi=600, bbox_inches="tight", pad_inches=0.1)
         plt.close(fig)
         image_path = out_file
     except Exception:
