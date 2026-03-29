@@ -8,6 +8,11 @@ import warnings
 warnings.filterwarnings("ignore")
 
 try:
+    import scikit_posthocs as sp
+except ImportError:
+    sp = None
+
+try:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -17,6 +22,19 @@ except Exception:
     sns = None
 
 BASE_ORANGE = "#ff6002"
+
+# Tradução dos rótulos sociodemográficos para inglês
+SOCIO_LABEL_EN = {
+    'Obrig./Opcional': 'Mand./Optional',
+    'Idade': 'Age',
+    'Gênero': 'Gender',
+    'Estado': 'State',
+    'Instrução': 'Education',
+    'Experiência': 'Experience',
+    'Nível Prof.': 'Prof. Level',
+    'Tamanho Emp.': 'Company Size',
+    'Área Atuação': 'Work Area',
+}
 
 # Mapeamento exato das colunas sociodemográficas
 SOCIODEMOGRAPHIC_COLS = {
@@ -109,146 +127,336 @@ def convert_age_to_numeric(age_str: str) -> Optional[float]:
     return None
 
 
-def calculate_pvalues(df: pd.DataFrame, likert_cols: List[str], 
-                     socio_cols_found: List[str]) -> pd.DataFrame:
+def classify_effect_size(value: float, test_type: str) -> str:
+    """Classifica o tamanho de efeito em negligível/pequeno/médio/grande."""
+    if test_type == "spearman":
+        v = abs(value)
+        if v < 0.10:
+            return "negligível"
+        elif v < 0.30:
+            return "pequeno"
+        elif v < 0.50:
+            return "médio"
+        else:
+            return "grande"
+    else:  # epsilon_squared (Kruskal-Wallis)
+        if value < 0.01:
+            return "negligível"
+        elif value < 0.06:
+            return "pequeno"
+        elif value < 0.14:
+            return "médio"
+        else:
+            return "grande"
+
+
+def calculate_pvalues(df: pd.DataFrame, likert_cols: List[str],
+                     socio_cols_found: List[str]) -> Tuple[pd.DataFrame, List[Dict]]:
     """
     Calcula matriz de p-valores entre demográficos e questões Likert.
-    
+
     Regras:
     - Idade: Spearman correlation
     - Outros categóricos: Kruskal-Wallis
     - Ignora grupos com n < 5
     - Remove "Prefiro não responder" de Experiência
+
+    Retorna: (pvalue_matrix, details) onde details contém estatísticas
+    e tamanho de efeito para cada combinação significativa.
     """
     n_questions = len(likert_cols)
     n_socio = len(socio_cols_found)
-    
+
     # Criar matriz vazia
     pvalue_matrix = pd.DataFrame(
         np.nan,
         index=[f"Q{i+1}" for i in range(n_questions)],
         columns=[SOCIODEMOGRAPHIC_COLS[col] for col in socio_cols_found]
     )
-    
+
+    details = []
+
     print("\n🔬 Calculando p-valores...")
-    
+
     for j, socio_col in enumerate(socio_cols_found):
         socio_label = SOCIODEMOGRAPHIC_COLS[socio_col]
-        
+
         for i, likert_col in enumerate(likert_cols):
             subset = df[[socio_col, likert_col]].copy()
             subset[likert_col] = pd.to_numeric(subset[likert_col], errors="coerce")
             subset = subset.dropna()
-            
-            # ⭐ REMOVER "Prefiro não responder" de Experiência
+
+            # REMOVER "Prefiro não responder" de Experiência
             if socio_label == "Experiência":
                 subset = subset[subset[socio_col] != "Prefiro não responder"].copy()
-            
+
             if len(subset) < 5:
                 continue
-            
+
             pval = None
-            
+            test_stat = None
+            test_type = None
+            effect_size = None
+            effect_label = None
+
             # Regra 1: Idade → Spearman
             if socio_label == "Idade":
                 try:
                     subset["age_numeric"] = subset[socio_col].apply(convert_age_to_numeric)
                     subset = subset.dropna(subset=["age_numeric"])
                     if len(subset) >= 5:
-                        stat, pval = stats.spearmanr(subset["age_numeric"], subset[likert_col])
+                        r, pval = stats.spearmanr(subset["age_numeric"], subset[likert_col])
+                        test_stat = r
+                        test_type = "spearman"
+                        effect_size = abs(r)
+                        effect_label = classify_effect_size(r, "spearman")
                 except Exception:
                     pass
-            
+
             # Regra 2: Categóricos → Kruskal-Wallis
             else:
                 try:
                     groups = {}
                     for cat in subset[socio_col].unique():
                         vals = subset[subset[socio_col] == cat][likert_col].values
-                        if len(vals) >= 5:  # ← Filtrar grupos pequenos
+                        if len(vals) >= 5:
                             groups[cat] = vals
-                    
+
                     if len(groups) >= 2:
-                        stat, pval = stats.kruskal(*groups.values())
+                        H, pval = stats.kruskal(*groups.values())
+                        test_stat = H
+                        test_type = "kruskal"
+                        n = sum(len(v) for v in groups.values())
+                        effect_size = H / (n - 1)  # epsilon-squared
+                        effect_label = classify_effect_size(effect_size, "kruskal")
                 except Exception:
                     pass
-            
+
             if pval is not None:
                 pvalue_matrix.iloc[i, j] = pval
+
+                detail = {
+                    "socio_col": socio_col,
+                    "socio_label": socio_label,
+                    "likert_col": likert_col,
+                    "q_label": f"Q{i+1}",
+                    "test_type": test_type,
+                    "test_stat": test_stat,
+                    "p_value": pval,
+                    "effect_size": effect_size,
+                    "effect_label": effect_label,
+                }
+                details.append(detail)
+
                 if pval < 0.05:
-                    print(f"  ⭐ {socio_label:15} × Q{i+1:2d}: p={pval:.4f} ***")
-    
-    return pvalue_matrix
+                    if test_type == "spearman":
+                        print(f"  ⭐ {socio_label:15} × Q{i+1:2d}: r={test_stat:.3f}, p={pval:.4f} (efeito {effect_label})")
+                    else:
+                        print(f"  ⭐ {socio_label:15} × Q{i+1:2d}: H={test_stat:.2f}, p={pval:.4f}, ε²={effect_size:.3f} (efeito {effect_label})")
+
+    return pvalue_matrix, details
 
 
-def plot_heatmap(pvalue_matrix: pd.DataFrame, out_dir: Path) -> Optional[Path]:
+def run_posthoc(df: pd.DataFrame, details: List[Dict],
+                likert_cols: List[str]) -> List[Dict]:
+    """
+    Executa testes post-hoc de Dunn com correção de Bonferroni para
+    combinações Kruskal-Wallis significativas (p < 0.05).
+
+    Retorna lista de resultados post-hoc com pares significativos.
+    """
+    if sp is None:
+        print("\n⚠️  scikit-posthocs não instalado. Instale com: pip install scikit-posthocs")
+        return []
+
+    significant_kw = [d for d in details if d["test_type"] == "kruskal" and d["p_value"] < 0.05]
+
+    if not significant_kw:
+        print("\n📊 Nenhum Kruskal-Wallis significativo para post-hoc.")
+        return []
+
+    print(f"\n🔍 Executando post-hoc de Dunn (Bonferroni) para {len(significant_kw)} combinações...")
+
+    posthoc_results = []
+
+    for d in significant_kw:
+        socio_col = d["socio_col"]
+        socio_label = d["socio_label"]
+        likert_col = d["likert_col"]
+        q_label = d["q_label"]
+
+        subset = df[[socio_col, likert_col]].copy()
+        subset[likert_col] = pd.to_numeric(subset[likert_col], errors="coerce")
+        subset = subset.dropna()
+
+        if socio_label == "Experiência":
+            subset = subset[subset[socio_col] != "Prefiro não responder"].copy()
+
+        # Filtrar grupos com n < 5
+        group_counts = subset[socio_col].value_counts()
+        valid_groups = group_counts[group_counts >= 5].index
+        subset = subset[subset[socio_col].isin(valid_groups)]
+
+        if subset[socio_col].nunique() < 2:
+            continue
+
+        try:
+            dunn = sp.posthoc_dunn(
+                subset,
+                val_col=likert_col,
+                group_col=socio_col,
+                p_adjust='bonferroni'
+            )
+        except Exception as e:
+            print(f"  ⚠️  Erro no post-hoc {socio_label} × {q_label}: {e}")
+            continue
+
+        # Extrair pares significativos
+        likert_short = likert_col.split("]")[0].replace("[", "").strip() if "]" in likert_col else likert_col
+
+        print(f"\n  {socio_label} × {q_label} ({likert_short})")
+        print(f"    Kruskal-Wallis: H={d['test_stat']:.2f}, p={d['p_value']:.4f}, ε²={d['effect_size']:.3f} (efeito {d['effect_label']})")
+        print(f"    Post-hoc Dunn (Bonferroni):")
+
+        found_sig = False
+        for g1_idx, g1 in enumerate(dunn.index):
+            for g2_idx, g2 in enumerate(dunn.columns):
+                if g1_idx >= g2_idx:
+                    continue
+                p_dunn = dunn.loc[g1, g2]
+                if p_dunn < 0.05:
+                    found_sig = True
+                    stars = "***" if p_dunn < 0.001 else "**" if p_dunn < 0.01 else "*"
+                    print(f"      {g1} vs {g2}: p={p_dunn:.4f} {stars}")
+
+                    posthoc_results.append({
+                        "socio_label": socio_label,
+                        "q_label": q_label,
+                        "likert_col": likert_short,
+                        "H_stat": d["test_stat"],
+                        "kw_p_value": d["p_value"],
+                        "epsilon_sq": d["effect_size"],
+                        "effect_label": d["effect_label"],
+                        "group_1": g1,
+                        "group_2": g2,
+                        "dunn_p_bonferroni": p_dunn,
+                    })
+
+        if not found_sig:
+            print(f"      (nenhum par significativo após correção de Bonferroni)")
+
+    return posthoc_results
+
+
+def save_posthoc_csv(posthoc_results: List[Dict], details: List[Dict],
+                     out_dir: Path) -> Tuple[Optional[Path], Optional[Path]]:
+    """Salva resultados post-hoc e resumo de efeitos em CSV."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    posthoc_path = None
+    effects_path = None
+
+    # 1. CSV de post-hoc
+    if posthoc_results:
+        df_posthoc = pd.DataFrame(posthoc_results)
+        posthoc_path = out_dir / "posthoc_dunn_bonferroni.csv"
+        df_posthoc.to_csv(posthoc_path, index=False)
+        print(f"\n✅ Post-hoc salvo em: {posthoc_path}")
+
+    # 2. CSV de efeitos (todas as combinações significativas)
+    sig_details = [d for d in details if d["p_value"] < 0.05]
+    if sig_details:
+        rows = []
+        for d in sig_details:
+            row = {
+                "socio_label": d["socio_label"],
+                "q_label": d["q_label"],
+                "test_type": d["test_type"],
+                "test_stat": round(d["test_stat"], 4),
+                "p_value": round(d["p_value"], 6),
+                "effect_size": round(d["effect_size"], 4),
+                "effect_label": d["effect_label"],
+            }
+            rows.append(row)
+        df_effects = pd.DataFrame(rows)
+        effects_path = out_dir / "effect_sizes.csv"
+        df_effects.to_csv(effects_path, index=False)
+        print(f"✅ Tamanhos de efeito salvos em: {effects_path}")
+
+    return posthoc_path, effects_path
+
+
+def plot_heatmap(pvalue_matrix: pd.DataFrame, out_dir: Path,
+                 lang: str = "pt") -> Optional[Path]:
     """
     Plota heatmap com p-valores, destaca em negrito valores < 0.05.
     Usa paleta de laranja do projeto.
+
+    lang: "pt" para português, "en" para inglês.
     """
     if plt is None or sns is None:
         print("❌ matplotlib/seaborn não disponível")
         return None
-    
+
     out_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    matrix = pvalue_matrix.copy()
+    if lang == "en":
+        matrix.columns = [SOCIO_LABEL_EN.get(c, c) for c in matrix.columns]
+        xlabel = "Sociodemographic Variables"
+        ylabel = "Effectiveness and Quality Variables"
+        suffix = "_en"
+    else:
+        xlabel = "Variáveis Sociodemográficas"
+        ylabel = "Variáveis Efetividade e Qualidade"
+        suffix = ""
+
     fig, ax = plt.subplots(figsize=(12, 14))
-    
-    # Usar colormap branco (sem cores)
-    cmap = "gray"
-     
-    # Plotar heatmap
+
     sns.heatmap(
-        pvalue_matrix,
+        matrix,
         annot=True,
         fmt=".4f",
-        cmap=cmap,
+        cmap="gray",
         cbar=False,
         ax=ax,
         linewidths=0.5,
         linecolor="gray",
         vmin=0,
-        vmax=0.05,  # Apenas valores até 0.05 recebem cor
+        vmax=0.05,
     )
-    
-    # Remover título
-    # Rótulos do eixo X no topo
+
     ax.xaxis.tick_top()
     ax.xaxis.set_label_position("top")
-    
-    ax.set_xlabel("Variáveis Sociodemográficas", fontsize=14, fontweight="bold")
-    ax.set_ylabel("Variáveis Efetividade e Qualidade", fontsize=14, fontweight="bold")
+
+    ax.set_xlabel(xlabel, fontsize=14, fontweight="bold")
+    ax.set_ylabel(ylabel, fontsize=14, fontweight="bold")
     ax.tick_params(axis='x', labelsize=12)
     ax.tick_params(axis='y', labelsize=12)
-    
-    # ⭐ Colorir apenas células significativas com laranja
-    for i, q_idx in enumerate(pvalue_matrix.index):
-        for j, socio_col in enumerate(pvalue_matrix.columns):
-            pval = pvalue_matrix.iloc[i, j]
-            
+
+    for i, q_idx in enumerate(matrix.index):
+        for j, socio_col in enumerate(matrix.columns):
+            pval = matrix.iloc[i, j]
+
             if pd.notna(pval):
                 if pval < 0.05:
-                    # Cores mais escuras para p-valores mais baixos
                     if pval < 0.001:
-                        color = BASE_ORANGE  # #ff6002 (escuro)
+                        color = BASE_ORANGE
                     elif pval < 0.01:
-                        color = "#ff8533"  # laranja médio
+                        color = "#ff8533"
                     else:
-                        color = "#ffb366"  # laranja claro
-                    
-                    # Pintar célula
-                    rect = plt.Rectangle((j, i), 1, 1, fill=True, 
-                                        facecolor=color, edgecolor="gray", 
+                        color = "#ffb366"
+
+                    rect = plt.Rectangle((j, i), 1, 1, fill=True,
+                                        facecolor=color, edgecolor="gray",
                                         linewidth=0.5, zorder=2)
                     ax.add_patch(rect)
                 else:
-                    # Células não-significativas em branco
-                    rect = plt.Rectangle((j, i), 1, 1, fill=True, 
-                                        facecolor="white", edgecolor="gray", 
+                    rect = plt.Rectangle((j, i), 1, 1, fill=True,
+                                        facecolor="white", edgecolor="gray",
                                         linewidth=0.5, zorder=2)
                     ax.add_patch(rect)
-    
-    # ⭐ CRÍTICO: Destacar em negrito valores p < 0.05
+
     for text in ax.texts:
         try:
             val = float(text.get_text())
@@ -261,42 +469,41 @@ def plot_heatmap(pvalue_matrix: pd.DataFrame, out_dir: Path) -> Optional[Path]:
                 text.set_color("black")
         except ValueError:
             pass
-     
+
     plt.tight_layout()
-    out_path = out_dir / "significancia_heatmap.png"
+    out_path = out_dir / f"significancia_heatmap{suffix}.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    
-    print(f"\n✅ Heatmap salvo em: {out_path}")
+
+    print(f"✅ Heatmap salvo em: {out_path}")
     return out_path
 
 
-def print_ranking(pvalue_matrix: pd.DataFrame) -> None:
-    """Imprime ranking de diferenças significativas (p < 0.05)."""
-    print("\n" + "="*70)
+def print_ranking(pvalue_matrix: pd.DataFrame, details: List[Dict]) -> None:
+    """Imprime ranking de diferenças significativas (p < 0.05) com tamanho de efeito."""
+    print("\n" + "="*80)
     print("📊 RANKING DE SIGNIFICÂNCIA ESTATÍSTICA (p < 0.05)")
-    print("="*70)
-    
-    significant = []
-    for q_idx, row in pvalue_matrix.iterrows():
-        for socio_col, pval in row.items():
-            if pd.notna(pval) and pval < 0.05:
-                significant.append((pval, q_idx, socio_col))
-    
-    if not significant:
+    print("="*80)
+
+    sig_details = [d for d in details if d["p_value"] < 0.05]
+
+    if not sig_details:
         print("❌ Nenhuma diferença estatisticamente significativa encontrada (α=0.05)")
         return
-    
-    # Ordenar por p-valor
-    significant.sort(key=lambda x: x[0])
-    
-    print(f"\n🎯 Total de combinações significativas: {len(significant)}\n")
-    
-    for rank, (pval, q_idx, socio_col) in enumerate(significant, 1):
-        stars = "***" if pval < 0.001 else "**" if pval < 0.01 else "*"
-        print(f"{rank:2d}. {q_idx:3s} × {socio_col:18s} | p={pval:.6f} {stars}")
-    
-    print("\n" + "="*70)
+
+    sig_details.sort(key=lambda x: x["p_value"])
+
+    print(f"\n🎯 Total de combinações significativas: {len(sig_details)}\n")
+
+    for rank, d in enumerate(sig_details, 1):
+        stars = "***" if d["p_value"] < 0.001 else "**" if d["p_value"] < 0.01 else "*"
+        if d["test_type"] == "spearman":
+            stat_str = f"r={d['test_stat']:.3f}"
+        else:
+            stat_str = f"H={d['test_stat']:.2f}, ε²={d['effect_size']:.3f}"
+        print(f"{rank:2d}. {d['q_label']:3s} × {d['socio_label']:18s} | p={d['p_value']:.6f} {stars} | {stat_str} (efeito {d['effect_label']})")
+
+    print("\n" + "="*80)
 
 
 def analyze_significancia(csv_path: Optional[Path] = None, 
@@ -333,23 +540,35 @@ def analyze_significancia(csv_path: Optional[Path] = None,
     for socio_col in socio_cols_found:
         df_likert[socio_col] = df[socio_col]
     
-    # 3️⃣ Calcular p-valores
-    pvalue_matrix = calculate_pvalues(df_likert, likert_cols, socio_cols_found)
+    # 3️⃣ Calcular p-valores e tamanhos de efeito
+    pvalue_matrix, details = calculate_pvalues(df_likert, likert_cols, socio_cols_found)
     print(f"✓ Matriz de p-valores: {pvalue_matrix.shape}")
-    
-    # 4️⃣ Plotar heatmap
-    heatmap_path = plot_heatmap(pvalue_matrix, out_dir)
-    
-    # 5️⃣ Imprimir ranking
-    print_ranking(pvalue_matrix)
-    
+
+    # 4️⃣ Plotar heatmaps (PT e EN)
+    heatmap_path = plot_heatmap(pvalue_matrix, out_dir, lang="pt")
+    heatmap_path_en = plot_heatmap(pvalue_matrix, out_dir, lang="en")
+
+    # 5️⃣ Imprimir ranking com tamanhos de efeito
+    print_ranking(pvalue_matrix, details)
+
+    # 6️⃣ Post-hoc de Dunn (Bonferroni) para Kruskal-Wallis significativos
+    posthoc_results = run_posthoc(df_likert, details, likert_cols)
+
+    # 7️⃣ Salvar CSVs de post-hoc e tamanhos de efeito
+    posthoc_path, effects_path = save_posthoc_csv(posthoc_results, details, out_dir)
+
     return {
         "status": "ok",
         "n_questions": len(likert_cols),
         "n_sociodemographic": len(socio_cols_found),
         "pvalue_matrix_shape": pvalue_matrix.shape,
         "heatmap_path": heatmap_path,
+        "heatmap_path_en": heatmap_path_en,
         "pvalue_matrix": pvalue_matrix,
+        "details": details,
+        "posthoc_results": posthoc_results,
+        "posthoc_csv": posthoc_path,
+        "effects_csv": effects_path,
     }
 
 
